@@ -1,0 +1,113 @@
+{
+  "$defs": {
+    "DecompositionOptions": {
+      "additionalProperties": false,
+      "description": "LOS -> east/up (venti.decomposition).",
+      "properties": {
+        "cond_max": {
+          "default": 10.0,
+          "description": "Above this condition number of the weighted design the WLS solve is not trusted and the pixel is projected (mode 2).",
+          "exclusiveMinimum": 1,
+          "title": "Cond Max",
+          "type": "number"
+        },
+        "min_up": {
+          "default": 0.1,
+          "description": "Minimum |up| component of the look vector for the single-geometry projection.",
+          "exclusiveMaximum": 1,
+          "exclusiveMinimum": 0,
+          "title": "Min Up",
+          "type": "number"
+        },
+        "sigma_disp_meters": {
+          "default": 0.01,
+          "description": "DISP noise below the calibration cutoff added to sigma_CAL (PRD R-E2 placeholder until TS-S1). Units: meters.",
+          "minimum": 0,
+          "title": "Sigma Disp Meters",
+          "type": "number"
+        }
+      },
+      "title": "DecompositionOptions",
+      "type": "object"
+    },
+    "GnssOptions": {
+      "additionalProperties": false,
+      "description": "Horizontal GNSS used to fix north (and east in mode 2).",
+      "properties": {
+        "horizontal_source": {
+          "default": "cal_product",
+          "description": "cal_product: gnss_ve/gnss_vn layers of DISP-CAL; grid: sample the frozen UNR snapshot with Venti.",
+          "enum": [
+            "cal_product",
+            "grid"
+          ],
+          "title": "Horizontal Source",
+          "type": "string"
+        },
+        "require_provenance_match": {
+          "default": true,
+          "description": "Fail if the GNSS provenance digest differs from the one recorded in the DISP-CAL products.",
+          "title": "Require Provenance Match",
+          "type": "boolean"
+        }
+      },
+      "title": "GnssOptions",
+      "type": "object"
+    },
+    "TemporalOptions": {
+      "additionalProperties": false,
+      "description": "Resampling asc and desc onto common epochs (venti.temporal).",
+      "properties": {
+        "window_days": {
+          "default": 96.0,
+          "description": "Full width of the moving window. Units: days.",
+          "exclusiveMinimum": 0,
+          "title": "Window Days",
+          "type": "number"
+        },
+        "method": {
+          "default": "huber_linear",
+          "description": "Robust line fit used in each window.",
+          "enum": [
+            "huber_linear",
+            "theil_sen",
+            "linear"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "min_points": {
+          "default": 3,
+          "description": "Fewer epochs in a window give no value.",
+          "minimum": 2,
+          "title": "Min Points",
+          "type": "integer"
+        },
+        "max_extrapolation_days": {
+          "default": 0.0,
+          "description": "Targets farther than this outside a series are not produced. Units: days.",
+          "minimum": 0,
+          "title": "Max Extrapolation Days",
+          "type": "number"
+        }
+      },
+      "title": "TemporalOptions",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "OPERA Vertical Land Motion from DISP and DISP-CAL algorithm parameters.",
+  "properties": {
+    "decomposition_options": {
+      "$ref": "#/$defs/DecompositionOptions"
+    },
+    "temporal_options": {
+      "$ref": "#/$defs/TemporalOptions"
+    },
+    "gnss_options": {
+      "$ref": "#/$defs/GnssOptions"
+    }
+  },
+  "title": "AlgorithmParameters",
+  "type": "object"
+}

@@ -1,0 +1,112 @@
+# REQUIRED: A PGE (Product Generation Executive) run configuration.
+opera_vlm_workflow:
+  # REQUIRED: Configuration for required input files.
+  #   Type: Object.
+  input_file_group:
+    # REQUIRED: Frame ID of the products to process.
+    #   Type: integer.
+    frame_id: 0
+    # Ascending DISP products (DISP-S1 for VLM-S1, DISP-NISAR for VLM-NI) of the frame stack.
+    #   Type: array.
+    ascending_disp_files: []
+    # Descending DISP products over the same area. If absent, vertical comes from the single-
+    #       geometry projection (mode 2) everywhere.
+    #   Type: array.
+    descending_disp_files: []
+    # DISP-CAL products matching each ascending DISP product (same reference/secondary dates).
+    #   Type: array.
+    ascending_cal_files: []
+    # DISP-CAL products matching each descending DISP product; required when
+    #       descending_disp_files is given.
+    #   Type: array.
+    descending_cal_files: []
+    # UNR grid lookup of the frozen snapshot. Used for GNSS east/north only when the DISP-CAL
+    #       products carry no gnss_ve/gnss_vn layers; the provenance hash must then match the
+    #       one in DISP-CAL.
+    #   Type: string | null.
+    unr_grid_latlon_file:
+    # Node files of the frozen UNR snapshot (nodes/ of unr_grid_<version>_<date>); see
+    #       unr_grid_latlon_file.
+    #   Type: string | null.
+    unr_timeseries_dir:
+  # REQUIRED: Ancillary files that change per job.
+  #   Type: Object.
+  dynamic_ancillary_file_group:
+    # REQUIRED: Path to file containing SAS algorithm parameters (YAML).
+    #   Type: string.
+    algorithm_parameters_file:
+    # REQUIRED: DISP-S1-STATIC line_of_sight_enu of the ascending frame.
+    #   Type: string.
+    los_file_ascending:
+    # DISP-S1-STATIC line_of_sight_enu of the descending frame; required with descending inputs.
+    #   Type: string | null.
+    los_file_descending:
+  # Versioned, job-independent ancillary databases.
+  #   Type: Object.
+  static_ancillary_file_group:
+    # JSON file of per-frame_id algorithm parameter overrides applied on top of the
+    #       algorithm_parameters_file. Format: {"data": {"<frame_id>": {<option group>:
+    #       {<option>: <value>}}}}.
+    #   Type: string | null.
+    algorithm_parameters_overrides_json:
+    # GIA vertical-rate model (ICE-6G_D) for the context layer; omitted -> no GIA context layer.
+    #   Type: string | null.
+    gia_model_file:
+  # Primary executable configuration.
+  #   Type: Object.
+  primary_executable:
+    # Product type of the PGE.
+    #   Type: string.
+    product_type: VLM
+  # Output product options.
+  #   Type: Object.
+  output_options:
+    # Version of the product, in <major>.<minor> format.
+    #   Type: string.
+    product_version: '0.1'
+    # Write raster layers gzip-compressed (level 4 + shuffle).
+    #   Type: boolean.
+    compression: true
+    # Processing facility written to /identification.
+    #   Type: string.
+    processing_facility: NASA Jet Propulsion Laboratory on AWS
+    # URL (or DOI) where this product can be retrieved.
+    #   Type: string.
+    product_data_access: ''
+  # Product path configuration.
+  #   Type: Object.
+  product_path_group:
+    # Directory where PGE will place results.
+    #   Type: string.
+    product_path: .
+    # Path to the scratch directory for intermediate files.
+    #   Type: string.
+    scratch_path: scratch
+    # Path to the SAS output directory.
+    #   Type: string.
+    sas_output_path: output
+    # Keep the scratch directory after a successful run (debugging).
+    #   Type: boolean.
+    keep_scratch: false
+  # CPU/threading and block-size configuration.
+  #   Type: Object.
+  worker_settings:
+    # Number of worker processes (or dask workers) to use.
+    #   Type: integer.
+    n_workers: 1
+    # Threads per worker, exported to OMP/BLAS/GDAL thread variables.
+    #   Type: integer.
+    threads_per_worker: 4
+    # Size (rows, columns) of blocks of data to load at a time.
+    #   Type: array.
+    block_shape:
+      - 512
+      - 512
+  # Path to the output log file in addition to logging to stderr. If null,
+  #     <sas_output_path>/opera_vlm.log.
+  #   Type: string | null.
+  log_file:
+  # Run the numbered input prechecks (docs/error-codes.md) before processing. Escape hatch for
+  #     operators; leave true.
+  #   Type: boolean.
+  run_input_prechecks: true

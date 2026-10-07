@@ -1,0 +1,39 @@
+# LOS -> east/up (venti.decomposition).
+#   Type: Object.
+decomposition_options:
+  # Above this condition number of the weighted design the WLS solve is not trusted and the
+  #     pixel is projected (mode 2).
+  #   Type: number.
+  cond_max: 10.0
+  # Minimum |up| component of the look vector for the single-geometry projection.
+  #   Type: number.
+  min_up: 0.1
+  # DISP noise below the calibration cutoff added to sigma_CAL (PRD R-E2 placeholder until
+  #     TS-S1). Units: meters.
+  #   Type: number.
+  sigma_disp_meters: 0.01
+# Resampling asc and desc onto common epochs (venti.temporal).
+#   Type: Object.
+temporal_options:
+  # Full width of the moving window. Units: days.
+  #   Type: number.
+  window_days: 96.0
+  # Robust line fit used in each window.
+  #   Type: string.
+  method: huber_linear
+  # Fewer epochs in a window give no value.
+  #   Type: integer.
+  min_points: 3
+  # Targets farther than this outside a series are not produced. Units: days.
+  #   Type: number.
+  max_extrapolation_days: 0.0
+# Horizontal GNSS used to fix north (and east in mode 2).
+#   Type: Object.
+gnss_options:
+  # cal_product: gnss_ve/gnss_vn layers of DISP-CAL; grid: sample the frozen UNR snapshot with
+  #     Venti.
+  #   Type: string.
+  horizontal_source: cal_product
+  # Fail if the GNSS provenance digest differs from the one recorded in the DISP-CAL products.
+  #   Type: boolean.
+  require_provenance_match: true

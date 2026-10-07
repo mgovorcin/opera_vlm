@@ -1,0 +1,12 @@
+site_name: opera-vlm
+repo_url: https://github.com/mgovorcin/opera-vlm
+theme:
+  name: material
+nav:
+  - Home: index.md
+  - Product specification: product-spec.md
+  - Error codes: error-codes.md
+  - CEOS-ARD compliance: ceos-compliance.md
+plugins:
+  - search
+  - mkdocstrings

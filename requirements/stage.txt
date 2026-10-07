@@ -1,0 +1,3 @@
+# Network dependencies of `opera-vlm stage` (imported lazily)
+requests
+urllib3

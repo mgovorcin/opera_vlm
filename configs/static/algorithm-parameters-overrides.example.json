@@ -1,0 +1,8 @@
+{
+  "metadata": {
+    "created": "YYYY-MM-DD",
+    "author": "",
+    "description": "Per-frame_id algorithm parameter overrides. Keys under data are frame_id values (as strings)."
+  },
+  "data": {}
+}

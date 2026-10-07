@@ -1,0 +1,296 @@
+{
+  "dist_name": "opera-vlm",
+  "package": "opera_vlm",
+  "cli_name": "opera-vlm",
+  "title": "OPERA Vertical Land Motion from DISP and DISP-CAL",
+  "org": "mgovorcin",
+  "authors": "OPERA ADT Team",
+  "license": "Apache-2.0",
+  "python_min": "3.11",
+  "frame_based": true,
+  "override_key": "frame_id",
+  "root_key": "opera_vlm_workflow",
+  "parallel": "threads",
+  "sensors": [
+    "VLM-S1 (DISP-S1)",
+    "VLM-NI (DISP-NISAR, after Venti T58)"
+  ],
+  "dependencies": [
+    "scipy",
+    "pandas",
+    "rioxarray",
+    "rasterio>=1.4",
+    "pyproj>=3.3"
+  ],
+  "conda_only_dependencies": [
+    "gdal",
+    "libgdal-netcdf"
+  ],
+  "pypi_only_dependencies": [
+    "venti @ git+https://github.com/mgovorcin/venti-dev.git@a0fe190f011568e54bff7b7549cefbc3d8ddd8aa"
+  ],
+  "product": {
+    "product_type": "VLM",
+    "short_name": "VLM-S1",
+    "level": "L4",
+    "format": "netcdf",
+    "version": "0.1",
+    "processing_facility": "NASA Jet Propulsion Laboratory on AWS",
+    "product_data_access": "",
+    "layers": [
+      {
+        "name": "vertical",
+        "dtype": "float32",
+        "units": "meters",
+        "keep_bits": 12,
+        "description": "Vertical displacement of the pair (up positive), absolute in IGS20 after DISP-CAL."
+      },
+      {
+        "name": "vertical_std",
+        "dtype": "float32",
+        "units": "meters",
+        "keep_bits": 10,
+        "description": "1-sigma of vertical, propagated from sigma_CAL, sigma_DISP, the GNSS horizontal sigmas and the temporal resampling."
+      },
+      {
+        "name": "east",
+        "dtype": "float32",
+        "units": "meters",
+        "keep_bits": 12,
+        "description": "East displacement where ascending and descending overlap (mode 1); NaN elsewhere."
+      },
+      {
+        "name": "east_std",
+        "dtype": "float32",
+        "units": "meters",
+        "keep_bits": 10,
+        "description": "1-sigma of east."
+      },
+      {
+        "name": "mode",
+        "dtype": "uint8",
+        "units": "unitless",
+        "fill_value": 255,
+        "description": "0 no data, 1 asc+desc WLS with north from GNSS, 2 single-geometry projection with east and north from GNSS (valid for long-wavelength horizontal motion only)."
+      }
+    ]
+  },
+  "inputs": [
+    {
+      "name": "frame_id",
+      "group": "input",
+      "type": "int",
+      "required": true,
+      "description": "Frame ID of the products to process.",
+      "ge": 0,
+      "builtin": true
+    },
+    {
+      "name": "algorithm_parameters_file",
+      "group": "dynamic",
+      "type": "file",
+      "required": true,
+      "description": "Path to file containing SAS algorithm parameters (YAML).",
+      "cli_flag": "-a",
+      "builtin": true
+    },
+    {
+      "name": "algorithm_parameters_overrides_json",
+      "group": "static",
+      "type": "file",
+      "required": false,
+      "description": "JSON file of per-frame_id algorithm parameter overrides applied on top of the algorithm_parameters_file. Format: {\"data\": {\"<frame_id>\": {<option group>: {<option>: <value>}}}}.",
+      "builtin": true
+    },
+    {
+      "name": "ascending_disp_files",
+      "group": "input",
+      "type": "files",
+      "required": true,
+      "cli_flag": "-a",
+      "description": "Ascending DISP products (DISP-S1 for VLM-S1, DISP-NISAR for VLM-NI) of the frame stack."
+    },
+    {
+      "name": "descending_disp_files",
+      "group": "input",
+      "type": "files",
+      "required": false,
+      "cli_flag": "-d",
+      "description": "Descending DISP products over the same area. If absent, vertical comes from the single-geometry projection (mode 2) everywhere."
+    },
+    {
+      "name": "ascending_cal_files",
+      "group": "input",
+      "type": "files",
+      "required": true,
+      "description": "DISP-CAL products matching each ascending DISP product (same reference/secondary dates)."
+    },
+    {
+      "name": "descending_cal_files",
+      "group": "input",
+      "type": "files",
+      "required": false,
+      "description": "DISP-CAL products matching each descending DISP product; required when descending_disp_files is given."
+    },
+    {
+      "name": "unr_grid_latlon_file",
+      "group": "input",
+      "type": "file",
+      "required": false,
+      "description": "UNR grid lookup of the frozen snapshot. Used for GNSS east/north only when the DISP-CAL products carry no gnss_ve/gnss_vn layers; the provenance hash must then match the one in DISP-CAL."
+    },
+    {
+      "name": "unr_timeseries_dir",
+      "group": "input",
+      "type": "dir",
+      "required": false,
+      "description": "Node files of the frozen UNR snapshot (nodes/ of unr_grid_<version>_<date>); see unr_grid_latlon_file."
+    },
+    {
+      "name": "los_file_ascending",
+      "group": "dynamic",
+      "type": "file",
+      "required": true,
+      "description": "DISP-S1-STATIC line_of_sight_enu of the ascending frame."
+    },
+    {
+      "name": "los_file_descending",
+      "group": "dynamic",
+      "type": "file",
+      "required": false,
+      "description": "DISP-S1-STATIC line_of_sight_enu of the descending frame; required with descending inputs."
+    },
+    {
+      "name": "gia_model_file",
+      "group": "static",
+      "type": "file",
+      "required": false,
+      "description": "GIA vertical-rate model (ICE-6G_D) for the context layer; omitted -> no GIA context layer."
+    }
+  ],
+  "algorithm": {
+    "groups": [
+      {
+        "name": "decomposition_options",
+        "description": "LOS -> east/up (venti.decomposition).",
+        "params": [
+          {
+            "name": "cond_max",
+            "type": "float",
+            "default": 10.0,
+            "gt": 1,
+            "description": "Above this condition number of the weighted design the WLS solve is not trusted and the pixel is projected (mode 2)."
+          },
+          {
+            "name": "min_up",
+            "type": "float",
+            "default": 0.1,
+            "gt": 0,
+            "lt": 1,
+            "description": "Minimum |up| component of the look vector for the single-geometry projection."
+          },
+          {
+            "name": "sigma_disp_meters",
+            "type": "float",
+            "default": 0.01,
+            "ge": 0,
+            "units": "meters",
+            "description": "DISP noise below the calibration cutoff added to sigma_CAL (PRD R-E2 placeholder until TS-S1)."
+          }
+        ],
+        "_cls": "DecompositionOptions"
+      },
+      {
+        "name": "temporal_options",
+        "description": "Resampling asc and desc onto common epochs (venti.temporal).",
+        "params": [
+          {
+            "name": "window_days",
+            "type": "float",
+            "default": 96.0,
+            "gt": 0,
+            "units": "days",
+            "description": "Full width of the moving window."
+          },
+          {
+            "name": "method",
+            "type": "choice",
+            "choices": [
+              "huber_linear",
+              "theil_sen",
+              "linear"
+            ],
+            "default": "huber_linear",
+            "description": "Robust line fit used in each window."
+          },
+          {
+            "name": "min_points",
+            "type": "int",
+            "default": 3,
+            "ge": 2,
+            "description": "Fewer epochs in a window give no value."
+          },
+          {
+            "name": "max_extrapolation_days",
+            "type": "float",
+            "default": 0.0,
+            "ge": 0,
+            "units": "days",
+            "description": "Targets farther than this outside a series are not produced."
+          }
+        ],
+        "_cls": "TemporalOptions"
+      },
+      {
+        "name": "gnss_options",
+        "description": "Horizontal GNSS used to fix north (and east in mode 2).",
+        "params": [
+          {
+            "name": "horizontal_source",
+            "type": "choice",
+            "choices": [
+              "cal_product",
+              "grid"
+            ],
+            "default": "cal_product",
+            "description": "cal_product: gnss_ve/gnss_vn layers of DISP-CAL; grid: sample the frozen UNR snapshot with Venti."
+          },
+          {
+            "name": "require_provenance_match",
+            "type": "bool",
+            "default": true,
+            "description": "Fail if the GNSS provenance digest differs from the one recorded in the DISP-CAL products."
+          }
+        ],
+        "_cls": "GnssOptions"
+      }
+    ]
+  },
+  "ceos": {
+    "enabled": true,
+    "sensor": "sentinel-1",
+    "product_type": "InSAR",
+    "values": {
+      "ceos_product_measurement_projection": "vertical"
+    },
+    "extra_fields": []
+  },
+  "staging": [
+    {
+      "name": "disp",
+      "source": "ASF DAAC (opera-utils)",
+      "description": "Download DISP-S1 products for a frame and date range."
+    },
+    {
+      "name": "cal",
+      "source": "ASF DAAC",
+      "description": "Download the DISP-CAL products matching staged DISP products."
+    },
+    {
+      "name": "unr",
+      "source": "s3://opera-adt/opera-ancillary/unr-grid",
+      "description": "Fetch a frozen UNR grid snapshot (Venti plan T48)."
+    }
+  ],
+  "cli_aliases": []
+}

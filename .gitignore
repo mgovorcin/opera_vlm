@@ -1,0 +1,38 @@
+# setuptools_scm writes this on install; never commit
+src/opera_vlm/_version.py
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Environments
+.pixi/
+.venv/
+venv/
+
+# Tools
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+site/
+
+# Data and run outputs (golden data lives outside git; see scripts/)
+data/
+scratch/
+output/
+golden_data/
+delivery_data/
+*.nc
+*.h5
+*.tif
+*.log
+.DS_Store
+
+# generic skills are linked per checkout by 00_tools/skills/install.sh
+.claude/

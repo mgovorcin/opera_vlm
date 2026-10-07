@@ -1,0 +1,344 @@
+{
+  "$defs": {
+    "DynamicAncillaryFileGroup": {
+      "additionalProperties": false,
+      "description": "Ancillary files that change from job to job.",
+      "properties": {
+        "algorithm_parameters_file": {
+          "description": "Path to file containing SAS algorithm parameters (YAML).",
+          "format": "path",
+          "title": "Algorithm Parameters File",
+          "type": "string"
+        },
+        "los_file_ascending": {
+          "description": "DISP-S1-STATIC line_of_sight_enu of the ascending frame.",
+          "format": "path",
+          "title": "Los File Ascending",
+          "type": "string"
+        },
+        "los_file_descending": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "DISP-S1-STATIC line_of_sight_enu of the descending frame; required with descending inputs.",
+          "title": "Los File Descending"
+        }
+      },
+      "required": [
+        "algorithm_parameters_file",
+        "los_file_ascending"
+      ],
+      "title": "DynamicAncillaryFileGroup",
+      "type": "object"
+    },
+    "InputFileGroup": {
+      "additionalProperties": false,
+      "description": "Primary input files of one job.",
+      "properties": {
+        "frame_id": {
+          "description": "Frame ID of the products to process.",
+          "minimum": 0,
+          "title": "Frame Id",
+          "type": "integer"
+        },
+        "ascending_disp_files": {
+          "description": "Ascending DISP products (DISP-S1 for VLM-S1, DISP-NISAR for VLM-NI) of the frame stack.",
+          "items": {
+            "format": "path",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Ascending Disp Files",
+          "type": "array"
+        },
+        "descending_disp_files": {
+          "description": "Descending DISP products over the same area. If absent, vertical comes from the single-geometry projection (mode 2) everywhere.",
+          "items": {
+            "format": "path",
+            "type": "string"
+          },
+          "title": "Descending Disp Files",
+          "type": "array"
+        },
+        "ascending_cal_files": {
+          "description": "DISP-CAL products matching each ascending DISP product (same reference/secondary dates).",
+          "items": {
+            "format": "path",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Ascending Cal Files",
+          "type": "array"
+        },
+        "descending_cal_files": {
+          "description": "DISP-CAL products matching each descending DISP product; required when descending_disp_files is given.",
+          "items": {
+            "format": "path",
+            "type": "string"
+          },
+          "title": "Descending Cal Files",
+          "type": "array"
+        },
+        "unr_grid_latlon_file": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "UNR grid lookup of the frozen snapshot. Used for GNSS east/north only when the DISP-CAL products carry no gnss_ve/gnss_vn layers; the provenance hash must then match the one in DISP-CAL.",
+          "title": "Unr Grid Latlon File"
+        },
+        "unr_timeseries_dir": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Node files of the frozen UNR snapshot (nodes/ of unr_grid_<version>_<date>); see unr_grid_latlon_file.",
+          "title": "Unr Timeseries Dir"
+        }
+      },
+      "required": [
+        "frame_id"
+      ],
+      "title": "InputFileGroup",
+      "type": "object"
+    },
+    "OutputOptions": {
+      "additionalProperties": false,
+      "description": "Product-level options set by the PGE (not science parameters).",
+      "properties": {
+        "product_version": {
+          "default": "0.1",
+          "description": "Version of the product, in <major>.<minor> format.",
+          "pattern": "^\\d+\\.\\d+$",
+          "title": "Product Version",
+          "type": "string"
+        },
+        "compression": {
+          "default": true,
+          "description": "Write raster layers gzip-compressed (level 4 + shuffle).",
+          "title": "Compression",
+          "type": "boolean"
+        },
+        "processing_facility": {
+          "default": "NASA Jet Propulsion Laboratory on AWS",
+          "description": "Processing facility written to /identification.",
+          "title": "Processing Facility",
+          "type": "string"
+        },
+        "product_data_access": {
+          "default": "",
+          "description": "URL (or DOI) where this product can be retrieved.",
+          "title": "Product Data Access",
+          "type": "string"
+        }
+      },
+      "title": "OutputOptions",
+      "type": "object"
+    },
+    "PrimaryExecutable": {
+      "additionalProperties": false,
+      "description": "Group describing the primary executable.",
+      "properties": {
+        "product_type": {
+          "const": "VLM",
+          "default": "VLM",
+          "description": "Product type of the PGE.",
+          "title": "Product Type",
+          "type": "string"
+        }
+      },
+      "title": "PrimaryExecutable",
+      "type": "object"
+    },
+    "ProductPathGroup": {
+      "additionalProperties": false,
+      "description": "Group describing the product paths.",
+      "properties": {
+        "product_path": {
+          "default": ".",
+          "description": "Directory where PGE will place results.",
+          "format": "path",
+          "title": "Product Path",
+          "type": "string"
+        },
+        "scratch_path": {
+          "default": "scratch",
+          "description": "Path to the scratch directory for intermediate files.",
+          "format": "path",
+          "title": "Scratch Path",
+          "type": "string"
+        },
+        "sas_output_path": {
+          "default": "output",
+          "description": "Path to the SAS output directory.",
+          "format": "path",
+          "title": "Sas Output Path",
+          "type": "string"
+        },
+        "keep_scratch": {
+          "default": false,
+          "description": "Keep the scratch directory after a successful run (debugging).",
+          "title": "Keep Scratch",
+          "type": "boolean"
+        }
+      },
+      "title": "ProductPathGroup",
+      "type": "object"
+    },
+    "StaticAncillaryFileGroup": {
+      "additionalProperties": false,
+      "description": "Versioned, job-independent ancillary databases.",
+      "properties": {
+        "algorithm_parameters_overrides_json": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "JSON file of per-frame_id algorithm parameter overrides applied on top of the algorithm_parameters_file. Format: {\"data\": {\"<frame_id>\": {<option group>: {<option>: <value>}}}}.",
+          "title": "Algorithm Parameters Overrides Json"
+        },
+        "gia_model_file": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "GIA vertical-rate model (ICE-6G_D) for the context layer; omitted -> no GIA context layer.",
+          "title": "Gia Model File"
+        }
+      },
+      "title": "StaticAncillaryFileGroup",
+      "type": "object"
+    },
+    "WorkerSettings": {
+      "additionalProperties": false,
+      "description": "Settings for controlling CPU/threading and block processing.",
+      "properties": {
+        "n_workers": {
+          "default": 1,
+          "description": "Number of worker processes (or dask workers) to use.",
+          "maximum": 256,
+          "minimum": 1,
+          "title": "N Workers",
+          "type": "integer"
+        },
+        "threads_per_worker": {
+          "default": 4,
+          "description": "Threads per worker, exported to OMP/BLAS/GDAL thread variables.",
+          "maximum": 256,
+          "minimum": 1,
+          "title": "Threads Per Worker",
+          "type": "integer"
+        },
+        "block_shape": {
+          "default": [
+            512,
+            512
+          ],
+          "description": "Size (rows, columns) of blocks of data to load at a time.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Block Shape",
+          "type": "array"
+        }
+      },
+      "title": "WorkerSettings",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A PGE (Product Generation Executive) run configuration.",
+  "properties": {
+    "input_file_group": {
+      "$ref": "#/$defs/InputFileGroup",
+      "description": "Configuration for required input files."
+    },
+    "dynamic_ancillary_file_group": {
+      "$ref": "#/$defs/DynamicAncillaryFileGroup",
+      "description": "Ancillary files that change per job."
+    },
+    "static_ancillary_file_group": {
+      "$ref": "#/$defs/StaticAncillaryFileGroup"
+    },
+    "primary_executable": {
+      "$ref": "#/$defs/PrimaryExecutable",
+      "description": "Primary executable configuration."
+    },
+    "output_options": {
+      "$ref": "#/$defs/OutputOptions",
+      "description": "Output product options."
+    },
+    "product_path_group": {
+      "$ref": "#/$defs/ProductPathGroup",
+      "description": "Product path configuration."
+    },
+    "worker_settings": {
+      "$ref": "#/$defs/WorkerSettings",
+      "description": "CPU/threading and block-size configuration."
+    },
+    "log_file": {
+      "anyOf": [
+        {
+          "format": "path",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Path to the output log file in addition to logging to stderr. If null, <sas_output_path>/opera_vlm.log.",
+      "title": "Log File"
+    },
+    "run_input_prechecks": {
+      "default": true,
+      "description": "Run the numbered input prechecks (docs/error-codes.md) before processing. Escape hatch for operators; leave true.",
+      "title": "Run Input Prechecks",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "input_file_group",
+    "dynamic_ancillary_file_group"
+  ],
+  "title": "RunConfig",
+  "type": "object"
+}

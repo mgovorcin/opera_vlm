@@ -1,0 +1,28 @@
+# conda environment (Docker lockfile source: docker/create-lockfile.sh).
+# Keep in sync with [tool.pixi.dependencies] in pyproject.toml.
+name: opera-vlm
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.11,<3.14
+  - click
+  - h5netcdf
+  - h5py
+  - matplotlib-base
+  - numpy
+  - pydantic>=2.4
+  - ruamel.yaml
+  - xarray
+  - scipy
+  - pandas
+  - rioxarray
+  - rasterio>=1.4
+  - pyproj>=3.3
+  - gdal
+  - libgdal-netcdf
+  # test
+  - pytest
+  - pytest-randomly
+  - pip
+  - pip:
+    - -e .

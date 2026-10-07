@@ -1,0 +1,167 @@
+[build-system]
+requires = ["setuptools>=77", "setuptools_scm[toml]>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "opera-vlm"
+description = "OPERA Vertical Land Motion from DISP and DISP-CAL"
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "OPERA ADT Team" }]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+]
+dynamic = ["version", "optional-dependencies"]
+# Declare every runtime dependency here (a plain `pip install` must work);
+# conda-only C libraries go in environment.yml / [tool.pixi.dependencies] too.
+dependencies = [
+  "click",
+  "h5netcdf",
+  "h5py",
+  "matplotlib",
+  "numpy",
+  "pydantic>=2.4",
+  "ruamel.yaml",
+  "xarray",
+  "scipy",
+  "pandas",
+  "rioxarray",
+  "rasterio>=1.4",
+  "pyproj>=3.3",
+  "venti @ git+https://github.com/mgovorcin/venti-dev.git@a0fe190f011568e54bff7b7549cefbc3d8ddd8aa",
+]
+
+[project.urls]
+Homepage = "https://github.com/mgovorcin/opera-vlm"
+"Bug Tracker" = "https://github.com/mgovorcin/opera-vlm/issues"
+
+[project.scripts]
+opera-vlm = "opera_vlm.cli:cli_app"
+
+[tool.setuptools.dynamic.optional-dependencies]
+test = { file = ["requirements/test.txt"] }
+stage = { file = ["requirements/stage.txt"] }
+docs = { file = ["requirements/docs.txt"] }
+
+[tool.setuptools_scm]
+write_to = "src/opera_vlm/_version.py"
+version_scheme = "no-guess-dev"
+
+[tool.black]
+target-version = ["py311"]
+preview = true
+enable-unstable-feature = ["string_processing"]
+
+[tool.ruff]
+src = ["src"]
+line-length = 88
+exclude = ["*.ipynb", "src/opera_vlm/_version.py"]
+
+[tool.ruff.lint]
+select = ["A", "ARG", "B", "C4", "D", "E", "W", "EXE", "F", "I", "ISC", "N", "PTH", "PYI"]
+ignore = [
+  "D100", "D104", "D105", "D107", "D203", "D213",
+  "E501",    # black owns line length (long strings/URLs are fine)
+  "N803", "N806",
+  "PTH123",  # open() is fine
+  "PTH207",  # glob.glob is fine for user-supplied patterns
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["F401", "F403"]
+"tests/**" = ["D", "N", "PTH", "ARG"]
+"scripts/**" = ["D"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
+
+# The only pytest configuration (no tests/pytest.ini: it would silently win).
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config --randomly-seed=1234 --doctest-modules --ignore=scripts --ignore=docs"
+doctest_optionflags = "NORMALIZE_WHITESPACE NUMBER"
+markers = [
+  "slow: end-to-end runs (deselect with -m 'not slow')",
+  "golden: needs the golden dataset (GOLDEN_DIR env var)",
+  "requires_network: needs network access / Earthdata credentials",
+]
+filterwarnings = [
+  "error",
+  "ignore:.*pkg_resources.*",
+  "ignore:numpy.ndarray size changed:RuntimeWarning",
+]
+
+# ---------------------------------------------------------------------------
+# pixi: reproducible conda + PyPI environments and tasks
+#   pixi run test | lint | gen-configs | validate --golden-dir DIR
+# ---------------------------------------------------------------------------
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64"]
+
+[tool.pixi.dependencies]
+python = ">=3.11,<3.14"
+click = "*"
+h5netcdf = "*"
+h5py = "*"
+matplotlib-base = "*"
+numpy = "*"
+pydantic = ">=2.4"
+"ruamel.yaml" = "*"
+xarray = "*"
+pip = "*"
+"scipy" = "*"
+"pandas" = "*"
+"rioxarray" = "*"
+"rasterio" = ">=1.4"
+"pyproj" = ">=3.3"
+"gdal" = "*"
+"libgdal-netcdf" = "*"
+[tool.pixi.pypi-dependencies]
+opera-vlm = { path = ".", editable = true }
+
+# Feature, environments and the first six tasks follow
+# 00_tools/standards/pixi-tasks.toml (same names in every repo); the SAS adds
+# gen-configs and build-golden, and gives golden a real command.
+[tool.pixi.feature.dev.dependencies]
+pre-commit = "*"
+pytest = "*"
+pytest-cov = "*"
+pytest-randomly = "*"
+pytest-xdist = "*"
+ruff = "*"
+black = "*"
+mypy = "*"
+nbstripout = "*"
+mkdocs = "*"
+mkdocs-material = "*"
+mkdocs-jupyter = "*"
+mkdocs-gen-files = "*"
+mkdocs-literate-nav = "*"
+pymdown-extensions = "*"
+
+[tool.pixi.feature.dev.pypi-dependencies]
+mkdocstrings = { extras = ["python"] }
+mkdocs-section-index = "*"
+
+# ops: exactly the default dependency set (what the Docker image carries), linux-64.
+[tool.pixi.environments]
+dev = ["dev"]
+ops = { features = [], solve-group = "ops" }
+
+[tool.pixi.tasks]
+test = "pytest"
+lint = "pre-commit run -a"
+docs = "mkdocs build --strict"
+golden = { cmd = "bash scripts/run_validation.sh", description = "Validate against the golden dataset: pixi run golden --golden-dir DIR" }
+e2e = "echo 'no e2e validation in this repo'"
+clean = "rm -rf build/ dist/ *.egg-info/ .pytest_cache/ .coverage .ruff_cache/ .mypy_cache/ site/ && find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true"
+gen-configs = { cmd = "bash scripts/gen_configs.sh", description = "Regenerate configs/ and docs/ceos-compliance.md from the code" }
+build-golden = { cmd = "bash scripts/build_golden_output.sh", description = "Build the golden dataset (deliberate act)" }

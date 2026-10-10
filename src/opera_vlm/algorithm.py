@@ -306,11 +306,13 @@ def _stacks(workflow: Workflow) -> list[GeometryStack]:
 
     inputs = workflow.input_file_group
     layer = sensor_for_file(inputs.ascending_disp_files[0]).displacement_layer
+    masks = tuple(workflow.algorithm_parameters.input_options.mask_layers)
     stacks = [
         GeometryStack(
             inputs.ascending_disp_files,
             inputs.ascending_cal_files,
             displacement_layer=layer,
+            mask_layers=masks,
             name="ascending",
         )
     ]
@@ -326,6 +328,7 @@ def _stacks(workflow: Workflow) -> list[GeometryStack]:
                 inputs.descending_disp_files,
                 inputs.descending_cal_files,
                 displacement_layer=layer,
+                mask_layers=masks,
                 name="descending",
             )
         )

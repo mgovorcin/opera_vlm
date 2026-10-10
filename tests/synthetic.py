@@ -90,7 +90,7 @@ def _write_product(
         ref = f.create_dataset("spatial_ref", data=0)
         ref.attrs["crs_wkt"] = CRS.from_epsg(EPSG).to_wkt()
         for k, v in layers.items():
-            f[k] = v.astype(np.float32)
+            f[k] = v if v.dtype == np.uint8 else v.astype(np.float32)
         f["identification/source_data_satellite_names"] = "S1A, S1B"
 
 
@@ -206,7 +206,10 @@ def make_frame(
                 signal = v_los * _years(ref, sec) + dramp
                 signal += rng.normal(0, noise_m, signal.shape)
                 p = d / f"OPERA_L3_DISP-S1_IW_F99999_VV_{tag}_v1.0_20261010T000000Z.nc"
-                _write_product(p, x, y, {"displacement": signal})
+                # a little water in the same place for both looks: the 2 x 2
+                # pixels at the ascending grid's south-east corner
+                land = ((yy >= y_a[-3]) | (xx < x_a[-2] - posting / 2)).astype(np.uint8)
+                _write_product(p, x, y, {"displacement": signal, "water_mask": land})
                 c = (
                     d
                     / f"OPERA_L4_DISP-CAL-S1_IW_F99999_VV_{tag}_v1.0_20261010T000000Z.nc"

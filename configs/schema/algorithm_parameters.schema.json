@@ -20,8 +20,8 @@
           "type": "number"
         },
         "sigma_disp_meters": {
-          "default": 0.01,
-          "description": "DISP noise below the calibration cutoff added to sigma_CAL (PRD R-E2 placeholder until TS-S1). Units: meters.",
+          "default": 0.007,
+          "description": "Per-point DISP noise below the calibration cutoff (TS-S1: 3.9-6.8 mm on the four T38 frames, from 7 x 7 pixel medians, so a lower bound for one pixel); per-frame values in the static overrides file. Units: meters.",
           "minimum": 0,
           "title": "Sigma Disp Meters",
           "type": "number"
@@ -71,6 +71,22 @@
         }
       },
       "title": "GnssOptions",
+      "type": "object"
+    },
+    "InputOptions": {
+      "additionalProperties": false,
+      "description": "Which DISP pixels enter the run.",
+      "properties": {
+        "mask_layers": {
+          "description": "DISP mask layers (True = valid) applied to every pair before chaining; a pixel masked in any pair of the chain is NaN. recommended_mask varies from pair to pair; water_mask is the safe default.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Mask Layers",
+          "type": "array"
+        }
+      },
+      "title": "InputOptions",
       "type": "object"
     },
     "TemporalOptions": {
@@ -124,6 +140,9 @@
   "additionalProperties": false,
   "description": "OPERA Vertical Land Motion from DISP and DISP-CAL algorithm parameters.",
   "properties": {
+    "input_options": {
+      "$ref": "#/$defs/InputOptions"
+    },
     "decomposition_options": {
       "$ref": "#/$defs/DecompositionOptions"
     },

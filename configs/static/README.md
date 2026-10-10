@@ -14,3 +14,4 @@ Rules:
 
 | File | Purpose | sha256 |
 |---|---|---|
+| `opera-vlm-algorithm-parameters-overrides-2026-10-10.json` | Per-frame `sigma_disp_meters` from TS-S1 (F08882, F08886, F16940, F08622) | in git |

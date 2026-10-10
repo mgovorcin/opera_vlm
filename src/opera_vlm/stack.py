@@ -115,6 +115,8 @@ class GeometryStack:
         reference and secondary dates).
     displacement_layer : str
         DISP dataset name (``SensorSpec.displacement_layer``).
+    mask_layers : tuple of str
+        DISP mask layers (nonzero = valid) applied to every pair.
     name : str
         ``"ascending"`` or ``"descending"``, for messages.
 
@@ -133,10 +135,12 @@ class GeometryStack:
         cal_files: list[Path],
         *,
         displacement_layer: str = "displacement",
+        mask_layers: tuple[str, ...] = (),
         name: str = "ascending",
     ) -> None:
         self.name = name
         self.displacement_layer = displacement_layer
+        self.mask_layers = tuple(mask_layers)
         cal_by_dates: dict[tuple[datetime, datetime], Path] = {}
         for c in cal_files:
             cal_by_dates[pair_dates(c)] = Path(c)
@@ -193,6 +197,14 @@ class GeometryStack:
     def _pair_rows(self, pair: Pair, rows: slice) -> np.ndarray:
         with h5py.File(pair.disp, "r") as f:
             disp = f[self.displacement_layer][rows, :].astype(np.float64)
+            for layer in self.mask_layers:
+                if layer not in f:
+                    raise InputValidationError(
+                        f"{pair.disp.name} has no mask layer {layer!r}"
+                        " (input_options.mask_layers)",
+                        1003,
+                    )
+                disp[f[layer][rows, :] == 0] = np.nan
         with h5py.File(pair.cal, "r") as f:
             cal = f["calibration"]
             cal = cal[0, rows, :] if cal.ndim == 3 else cal[rows, :]

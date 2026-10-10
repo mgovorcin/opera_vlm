@@ -1,6 +1,7 @@
 # 0001. VLM runconfig and product: what is draft, what will be frozen
 
-- **Status:** draft for review (plan T52.2 / T52.3, 2026-10-09)
+- **Status:** decisions 1-6 accepted (owner, 2026-10-09 and 2026-10-10); the
+  "still draft" items below stay open until VLM v0.1 (T57)
 - **Context:** Venti PRD §3.2 and D15. DISP-CAL's runconfig is frozen;
   VLM's is not yet, and this record says which parts will be.
 
@@ -27,11 +28,17 @@
    2 projected (one look, or both looks ill-conditioned). These are
    `venti.decomposition`'s `MODE_WLS` and `MODE_PROJECTION`; an earlier draft
    of this record had 1 and 2 swapped.
-4. **One run, one product per target pair** (T56.2, 2026-10-10, for owner
-   review). A run takes the whole asc/desc stacks and writes a product for
+4. **One run, one product per target pair** (T56.2; owner, 2026-10-10). A run takes the whole asc/desc stacks and writes a product for
    every target pair `(T0, Tk)`: `T0` is the first target epoch, targets are
    every `temporal_options.target_spacing_days` over the span both geometries
    cover. Like DISP-S1, every product of a run shares its reference date.
+5. **Uncertainty, v0.1** (owner, 2026-10-10). Per look,
+   `sigma^2 = s_fit(T0)^2 + s_fit(Tk)^2 + s_cal(T0)^2 + s_cal(Tk)^2 + sigma_disp^2`.
+   `sigma_disp` is the per-point DISP noise from TS-S1: 7 mm by default,
+   per frame in the dated static overrides file (3.9-6.8 mm on the four
+   T38 frames).
+6. **Masks.** `input_options.mask_layers` (default `water_mask`) is applied
+   to every pair before chaining.
 
 ## To be frozen at VLM v0.1 (T57)
 

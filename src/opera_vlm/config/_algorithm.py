@@ -50,11 +50,27 @@ class DecompositionOptions(YamlModel):
     )
 
     sigma_disp_meters: float = Field(
-        default=0.01,
+        default=0.007,
         ge=0,
         description=(
-            "DISP noise below the calibration cutoff added to sigma_CAL (PRD R-E2 "
-            "placeholder until TS-S1). Units: meters."
+            "Per-point DISP noise below the calibration cutoff (TS-S1: 3.9-6.8 mm on "
+            "the four T38 frames, from 7 x 7 pixel medians, so a lower bound for one "
+            "pixel); per-frame values in the static overrides file. Units: meters."
+        ),
+    )
+
+    model_config = STRICT_CONFIG
+
+
+class InputOptions(YamlModel):
+    """Which DISP pixels enter the run."""
+
+    mask_layers: List[str] = Field(
+        default_factory=lambda: ["water_mask"],
+        description=(
+            "DISP mask layers (True = valid) applied to every pair before chaining;"
+            " a pixel masked in any pair of the chain is NaN. recommended_mask"
+            " varies from pair to pair; water_mask is the safe default."
         ),
     )
 
@@ -145,6 +161,11 @@ class GnssOptions(YamlModel):
 
 class AlgorithmParameters(YamlModel):
     """OPERA Vertical Land Motion from DISP and DISP-CAL algorithm parameters."""
+
+    input_options: InputOptions = Field(
+        default_factory=InputOptions,
+        description="Which DISP pixels enter the run.",
+    )
 
     decomposition_options: DecompositionOptions = Field(
         default_factory=DecompositionOptions,

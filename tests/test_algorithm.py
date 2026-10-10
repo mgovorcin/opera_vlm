@@ -48,7 +48,8 @@ def test_recovers_vertical_and_east(frame, tmp_path):
     assert all(r.reference_datetime == results[0].reference_datetime for r in results)
     # the descending grid starts 3.5 pixels east: 3 columns have one look only
     mode = results[0].layers["mode"].values
-    assert (mode[:, :3] == 2).all() and (mode[:, 4:] == 1).all()
+    assert (mode[:, :3] == 2).all() and (mode[:-2, 4:] == 1).all()
+    assert (mode[-2:, -2:] == 0).all()  # water
     for r in (results[0], results[4]):
         east, up = _truth(frame, r)
         ds = r.layers
@@ -61,7 +62,21 @@ def test_recovers_vertical_and_east(frame, tmp_path):
         assert np.nanmax(err_up[~wls]) < 2.5e-3  # projection with GNSS east/north
         sig = ds["vertical_std"].values
         assert np.isfinite(sig[wls | (ds["mode"].values == 2)]).all()
-        assert np.median(sig[~wls]) > np.median(sig[wls])
+        proj = ds["mode"].values == 2
+        assert np.median(sig[proj]) > np.median(sig[wls])
+
+
+def test_water_is_masked(frame, tmp_path):
+    """Pixels the DISP water_mask flags are no data (mode 0) in every product."""
+    r = next(iter(run_algorithm(_workflow(frame, tmp_path))))
+    mode = r.layers["mode"].values
+    assert (mode[-2:, -2:] == 0).all()
+    assert np.isnan(r.layers["vertical"].values[-2:, -2:]).all()
+    params = AlgorithmParameters().with_overrides(
+        {"input_options": {"mask_layers": ["recommended_mask"]}}
+    )
+    with pytest.raises(InputValidationError, match="no mask layer 'recommended_mask'"):
+        next(iter(run_algorithm(_workflow(frame, tmp_path, params))))
 
 
 def test_single_geometry_projects_everywhere(frame, tmp_path):
@@ -72,9 +87,11 @@ def test_single_geometry_projects_everywhere(frame, tmp_path):
     wf = wf.model_copy(update={"input_file_group": inputs})
     r = next(iter(run_algorithm(wf)))
     _, up = _truth(frame, r)
-    assert (r.layers["mode"].values == 2).all()
+    land = np.ones(r.layers["mode"].shape, bool)
+    land[-2:, -2:] = False
+    assert (r.layers["mode"].values[land] == 2).all()
     assert np.isnan(r.layers["east"].values).all()
-    assert np.abs(r.layers["vertical"].values - up).max() < 2.5e-3
+    assert np.nanmax(np.abs(r.layers["vertical"].values - up)) < 2.5e-3
     assert r.ceos["orbit_pass_direction"] == "Ascending"
 
 
@@ -125,7 +142,7 @@ def test_missing_provenance_needs_opt_out(tmp_path):
         {"gnss_options": {"require_provenance_match": False}}
     )
     r = next(iter(run_algorithm(_workflow(other, tmp_path, params))))
-    assert (r.layers["mode"].values > 0).all()
+    assert (r.layers["mode"].values[:-2] > 0).all()
 
 
 def test_gnss_needs_a_source(frame, tmp_path):

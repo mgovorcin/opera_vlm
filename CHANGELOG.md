@@ -13,6 +13,11 @@ tags (setuptools_scm). Mark entries that change product values with **[product]*
   `venti.temporal`, takes GNSS east/north from `venti.gnss.vlm` (provenance
   checked against DISP-CAL) and decomposes with `venti.decomposition`. One
   product per target pair `(T0, Tk)`; `run` now returns the list of products.
+- **[product]** `decomposition_options.sigma_disp_meters` default 0.01 ->
+  0.007 m (TS-S1 per-point DISP noise); per-frame values in
+  `configs/static/opera-vlm-algorithm-parameters-overrides-2026-10-10.json`.
+- **[product]** `input_options.mask_layers` (default `["water_mask"]`): DISP
+  masks applied to every pair before chaining.
 - `static_ancillary_file_group.defo_area_db_json` (optional): the deforming-area
   database DISP-CAL used, needed with `gnss_options.exclude_defo_nodes`.
 - Synthetic asc/desc frame with known east/north/up (`tests/synthetic.py`) and

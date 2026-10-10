@@ -19,10 +19,10 @@ from opera_vlm.config import AlgorithmParameters, RunConfig
 
 #: last pair (T0, T14): layer -> (nansum, value at [64, 64], value at [5, 1])
 EXPECTED = {
-    "vertical": (-33.029765110422964, -0.009237538042345296, -0.0015968624191466652),
-    "vertical_std": (152.32396586930153, 0.009203147594462202, 0.012883492950260096),
-    "east": (-88.1353451995466, -0.006031717168444907, np.nan),
-    "east_std": (189.41483108953818, 0.011837616566922931, np.nan),
+    "vertical": (-33.02842509922551, -0.009237538042345296, -0.0015968624191466652),
+    "vertical_std": (108.83178637687959, 0.006575200952769798, 0.009203930364438796),
+    "east": (-88.1056508200191, -0.006031717168444908, np.nan),
+    "east_std": (135.30886918415888, 0.008457366588602685, np.nan),
 }
 
 
@@ -41,4 +41,8 @@ def test_synthetic_128_regression(tmp_path):
             [np.nansum(v), v[64, 64], v[5, 1]], [total, centre, edge], rtol=1e-6
         )
     mode, counts = np.unique(ds["mode"].values, return_counts=True)
-    assert dict(zip(mode.tolist(), counts.tolist(), strict=True)) == {1: 16000, 2: 384}
+    assert dict(zip(mode.tolist(), counts.tolist(), strict=True)) == {
+        0: 4,  # the synthetic water corner
+        1: 15994,
+        2: 386,
+    }

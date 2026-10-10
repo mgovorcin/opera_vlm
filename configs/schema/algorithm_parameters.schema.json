@@ -46,8 +46,27 @@
         },
         "require_provenance_match": {
           "default": true,
-          "description": "Fail if the GNSS provenance digest differs from the one recorded in the DISP-CAL products.",
+          "description": "Fail unless every DISP-CAL product carries a GNSS provenance record and the realisation (grid version/type/frame, snapshot, lookup hash, buffer, defo-area DB version) matches it (venti.gnss.vlm.verify_provenance). False accepts products without a record (pre-T37.3) with a warning.",
           "title": "Require Provenance Match",
+          "type": "boolean"
+        },
+        "buffer_meters": {
+          "default": 50000.0,
+          "description": "Grid nodes this far outside the frame (R-G2). Must equal the DISP-CAL value: the provenance check fails otherwise.",
+          "minimum": 0,
+          "title": "Buffer Meters",
+          "type": "number"
+        },
+        "exclude_defo_nodes": {
+          "default": false,
+          "description": "Drop grid nodes inside the curated defo areas (R-G5); as DISP-CAL.",
+          "title": "Exclude Defo Nodes",
+          "type": "boolean"
+        },
+        "reinterpolate_excluded": {
+          "default": false,
+          "description": "Re-estimate the excluded nodes with GPS Imaging; as DISP-CAL.",
+          "title": "Reinterpolate Excluded",
           "type": "boolean"
         }
       },

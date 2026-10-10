@@ -34,6 +34,19 @@ gnss_options:
   #     Venti.
   #   Type: string.
   horizontal_source: cal_product
-  # Fail if the GNSS provenance digest differs from the one recorded in the DISP-CAL products.
+  # Fail unless every DISP-CAL product carries a GNSS provenance record and the realisation
+  #     (grid version/type/frame, snapshot, lookup hash, buffer, defo-area DB version) matches
+  #     it (venti.gnss.vlm.verify_provenance). False accepts products without a record
+  #     (pre-T37.3) with a warning.
   #   Type: boolean.
   require_provenance_match: true
+  # Grid nodes this far outside the frame (R-G2). Must equal the DISP-CAL value: the
+  #     provenance check fails otherwise.
+  #   Type: number.
+  buffer_meters: 50000.0
+  # Drop grid nodes inside the curated defo areas (R-G5); as DISP-CAL.
+  #   Type: boolean.
+  exclude_defo_nodes: false
+  # Re-estimate the excluded nodes with GPS Imaging; as DISP-CAL.
+  #   Type: boolean.
+  reinterpolate_excluded: false

@@ -106,9 +106,29 @@ class GnssOptions(YamlModel):
     require_provenance_match: bool = Field(
         default=True,
         description=(
-            "Fail if the GNSS provenance digest differs from the one recorded in the "
-            "DISP-CAL products."
+            "Fail unless every DISP-CAL product carries a GNSS provenance record and "
+            "the realisation (grid version/type/frame, snapshot, lookup hash, buffer, "
+            "defo-area DB version) matches it (venti.gnss.vlm.verify_provenance). "
+            "False accepts products without a record (pre-T37.3) with a warning."
         ),
+    )
+    buffer_meters: float = Field(
+        default=50_000.0,
+        ge=0,
+        description=(
+            "Grid nodes this far outside the frame (R-G2). Must equal the DISP-CAL "
+            "value: the provenance check fails otherwise."
+        ),
+    )
+    exclude_defo_nodes: bool = Field(
+        default=False,
+        description=(
+            "Drop grid nodes inside the curated defo areas (R-G5); as DISP-CAL."
+        ),
+    )
+    reinterpolate_excluded: bool = Field(
+        default=False,
+        description="Re-estimate the excluded nodes with GPS Imaging; as DISP-CAL.",
     )
 
     model_config = STRICT_CONFIG

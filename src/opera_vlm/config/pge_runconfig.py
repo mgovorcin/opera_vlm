@@ -77,6 +77,14 @@ class OutputOptions(YamlModel):
         default="",
         description="URL (or DOI) where this product can be retrieved.",
     )
+    write_velocity_product: bool = Field(
+        default=False,
+        description=(
+            "Also write a velocity-domain product: the chained velocity calibrated "
+            "once, instead of chaining per-pair DISP-CAL (owner decision 2026-10-09; "
+            "the per-pair product stays the official one)."
+        ),
+    )
     model_config = STRICT_CONFIG_WITH_ALIASES
 
 

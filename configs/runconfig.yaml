@@ -73,6 +73,11 @@ opera_vlm_workflow:
     # URL (or DOI) where this product can be retrieved.
     #   Type: string.
     product_data_access: ''
+    # Also write a velocity-domain product: the chained velocity calibrated once, instead of
+    #       chaining per-pair DISP-CAL (owner decision 2026-10-09; the per-pair product stays
+    #       the official one).
+    #   Type: boolean.
+    write_velocity_product: false
   # Product path configuration.
   #   Type: Object.
   product_path_group:

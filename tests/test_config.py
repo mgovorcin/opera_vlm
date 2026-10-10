@@ -99,3 +99,23 @@ def _first_option() -> tuple[str, str, object]:
                     continue
                 return group, option, value
     pytest.skip("no numeric/bool option to override")
+
+
+def test_vlm_product_and_gnss_options_draft():
+    """T52.2 draft: per-pair product official, velocity product opt-in; GNSS
+    options mirror DISP-CAL so the provenance check can pass."""
+    from pydantic import ValidationError
+
+    from opera_vlm.config._algorithm import GnssOptions
+    from opera_vlm.config.pge_runconfig import OutputOptions
+
+    assert OutputOptions().write_velocity_product is False
+    assert OutputOptions(write_velocity_product=True).write_velocity_product
+    g = GnssOptions()
+    assert g.require_provenance_match is True
+    assert g.buffer_meters == 50_000.0
+    assert not g.exclude_defo_nodes and not g.reinterpolate_excluded
+    with pytest.raises(ValidationError):
+        GnssOptions(buffer_meters=-1)
+    with pytest.raises(ValidationError):
+        GnssOptions(unknown_option=1)

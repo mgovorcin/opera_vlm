@@ -56,4 +56,7 @@
   `sigma_disp_meters`; the temporal window and method. TS results may move
   them.
 - The velocity-domain product's layers and their name.
-- Context layers (`gia_rate`, `plate_motion_rate`).
+- Context layers (T56.3): `plate_motion_east_rate`,
+  `plate_motion_north_rate` (always written) and `gia_vertical_rate` (only
+  with `gia_model_file`), in meters per year, never removed from `vertical`
+  or `east`.

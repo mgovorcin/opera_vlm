@@ -64,3 +64,16 @@ gnss_options:
   # Re-estimate the excluded nodes with GPS Imaging; as DISP-CAL.
   #   Type: boolean.
   reinterpolate_excluded: false
+# Context layers: rigid plate motion and GIA (opera_vlm.context).
+#   Type: Object.
+context_options:
+  # Plate of the plate_motion layers (ITRF2020-PMM name or UNR code: NA, PA, CA...). Null
+  #     takes it from Venti's frame-parameter table.
+  #   Type: string | null.
+  plate:
+  # Plate-motion model (geepers.euler).
+  #   Type: string.
+  plate_model: ITRF2020-PMM
+  # Vertical-rate variable of the GIA model file (mm/yr); ICE-6G_D calls it Drad_250.
+  #   Type: string.
+  gia_variable: Drad_250

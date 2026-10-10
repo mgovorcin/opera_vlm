@@ -102,6 +102,13 @@
           "title": "Min Points",
           "type": "integer"
         },
+        "target_spacing_days": {
+          "default": 12.0,
+          "description": "Spacing of the target epochs over the span both geometries cover; the first target is the reference of every product. Units: days.",
+          "exclusiveMinimum": 0,
+          "title": "Target Spacing Days",
+          "type": "number"
+        },
         "max_extrapolation_days": {
           "default": 0.0,
           "description": "Targets farther than this outside a series are not produced. Units: days.",

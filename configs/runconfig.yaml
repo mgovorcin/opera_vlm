@@ -49,6 +49,10 @@ opera_vlm_workflow:
     #       {<option>: <value>}}}}.
     #   Type: string | null.
     algorithm_parameters_overrides_json:
+    # Venti deforming-area database (GeoJSON) DISP-CAL used; needed when
+    #       gnss_options.exclude_defo_nodes is true.
+    #   Type: string | null.
+    defo_area_db_json:
     # GIA vertical-rate model (ICE-6G_D) for the context layer; omitted -> no GIA context layer.
     #   Type: string | null.
     gia_model_file:

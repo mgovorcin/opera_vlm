@@ -14,7 +14,7 @@ __all__ = ["run_cli", "run_main"]
 logger = logging.getLogger("opera_vlm")
 
 
-def run_main(config_file: str | Path, debug: bool = False) -> Path:
+def run_main(config_file: str | Path, debug: bool = False) -> list[Path]:
     """Load the runconfig, set up logging and threads, and run the job."""
     # Lazy imports: `--help` stays fast, and the thread variables are set
     # before numpy/GDAL are imported by the processing modules.

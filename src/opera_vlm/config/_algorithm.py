@@ -81,6 +81,15 @@ class TemporalOptions(YamlModel):
         description="Fewer epochs in a window give no value.",
     )
 
+    target_spacing_days: float = Field(
+        default=12.0,
+        gt=0,
+        description=(
+            "Spacing of the target epochs over the span both geometries cover; the "
+            "first target is the reference of every product. Units: days."
+        ),
+    )
+
     max_extrapolation_days: float = Field(
         default=0.0,
         ge=0,

@@ -2,6 +2,12 @@
 
 File name: `OPERA_<level>_<short name>_F<frame>_<start>_<end>_v<version>_<processing>.nc` (level `L4`, short name `VLM-S1`)
 
+One run writes one product per target pair `(T0, Tk)`: target epochs are
+every `temporal_options.target_spacing_days` over the span both geometries
+cover, and `T0` (the first) is the reference of every product of the run.
+`/identification` also carries `gnss_provenance_digest` (the GNSS realisation
+used for north and, in mode 2, east) and `number_of_looks` (1 or 2).
+
 Keep this page in sync with `src/opera_vlm/product/_layers.py` (the layer table
 in code). Groups:
 

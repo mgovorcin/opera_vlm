@@ -6,7 +6,8 @@
 ## What this repo is
 
 The OPERA Science Algorithm Software (SAS) for `VLM` (OPERA Vertical Land Motion from DISP and DISP-CAL).
-It turns one PGE runconfig into one `VLM-S1` product. It does **not**
+It turns one PGE runconfig into one `VLM-S1` product per target pair
+`(T0, Tk)` (ADR 0001). It does **not**
 download inputs during `run` (that is `opera-vlm stage`), schedule jobs, or move
 products (the PGE does).
 
@@ -16,7 +17,8 @@ products (the PGE does).
 src/opera_vlm/
   cli/            click: run, config, validate, ceos, stage   (entry point: opera-vlm run RUNCONFIG)
   config/         pydantic: PGE RunConfig -> resolved Workflow; algorithm params + overrides
-  algorithm.py    run_algorithm(Workflow) -> AlgorithmResult   (the science)
+  algorithm.py    run_algorithm(Workflow) -> Iterator[AlgorithmResult], one per target pair
+  stack.py        one geometry: DISP + DISP-CAL matched, chained across reference blocks
   product/        LAYERS spec, writer, /identification + /metadata, CEOS-ARD registry, browse
   stage/          downloaders, never imported by run
   validate.py     golden comparison

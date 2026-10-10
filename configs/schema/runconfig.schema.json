@@ -228,6 +228,20 @@
           "description": "JSON file of per-frame_id algorithm parameter overrides applied on top of the algorithm_parameters_file. Format: {\"data\": {\"<frame_id>\": {<option group>: {<option>: <value>}}}}.",
           "title": "Algorithm Parameters Overrides Json"
         },
+        "defo_area_db_json": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Venti deforming-area database (GeoJSON) DISP-CAL used; needed when gnss_options.exclude_defo_nodes is true.",
+          "title": "Defo Area Db Json"
+        },
         "gia_model_file": {
           "anyOf": [
             {

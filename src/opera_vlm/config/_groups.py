@@ -124,6 +124,14 @@ class StaticAncillaryFileGroup(YamlModel):
         ),
     )
 
+    defo_area_db_json: OptionalPath = Field(
+        default=None,
+        description=(
+            "Venti deforming-area database (GeoJSON) DISP-CAL used; needed when "
+            "gnss_options.exclude_defo_nodes is true."
+        ),
+    )
+
     gia_model_file: OptionalPath = Field(
         default=None,
         description=(

@@ -1,42 +1,66 @@
 # SPDX-FileCopyrightText: 2026 California Institute of Technology ("Caltech")
 # SPDX-License-Identifier: Apache-2.0
 # Part of opera-vlm, https://github.com/mgovorcin/opera-vlm.
-"""The science algorithm.
+"""The science algorithm: calibrated DISP (asc/desc) -> vertical per pair.
 
-`run_algorithm` receives the fully-resolved `Workflow` and returns the product
-layers plus what the product writer needs for /identification. It must not
-read YAML, apply defaults, or write the final product: config lives in
-config/, product formatting in product/.
+One run processes the stacks of one ascending frame (and optionally one
+descending frame) and yields one `AlgorithmResult` per target pair
+``(T0, Tk)`` (plan T56.2; per-pair VLM is the official product, ADR 0001):
 
-TODO(sas): replace the placeholder body. Until then every run logs a warning
-and produces a constant placeholder product, which keeps the full chain
-(config -> run -> product -> validate) testable from the first commit.
+1. **Target epochs** every `temporal_options.target_spacing_days` over the
+   span both geometries cover; ``T0`` is the first one and the reference of
+   every product.
+2. **Temporal resampling** (`venti.temporal.resample_timeseries`) of each
+   geometry's chained calibrated displacement at ``T0`` and ``Tk`` on its own
+   grid, row block by row block; the pair is ``R(Tk) - R(T0)``.
+3. **Common grid**: the descending pair (and both LOS files) are resampled
+   bilinearly onto the ascending grid, the product grid.
+4. **GNSS horizontal** (`venti.gnss.vlm.load_gnss_for_vlm`, provenance
+   checked against DISP-CAL) on a ~1 km grid, interpolated to the product
+   grid and scaled to the pair (`pair_displacement`).
+5. **Decomposition** (`venti.decomposition.decompose`): WLS east/up with
+   north from GNSS where both looks are valid and well conditioned (mode 1),
+   otherwise single-geometry projection with GNSS east and north (mode 2).
+
+Per-look sigma of the pair (v0.1 model)::
+
+    sigma^2 = s_fit(T0)^2 + s_fit(Tk)^2 + s_cal(T0)^2 + s_cal(Tk)^2 + sigma_disp^2
+
+``s_fit`` is the window-fit standard error, ``s_cal`` the DISP-CAL
+``calibration_std`` of the epoch nearest the target and ``sigma_disp`` the
+DISP noise below the calibration cutoff (TS-S1, a placeholder parameter).
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import xarray as xr
 
-from opera_vlm._log import log_runtime
 from opera_vlm.config import Workflow
-from opera_vlm.product import LAYERS
-from opera_vlm.product._ceos import CEOS_FIELDS, PLACEHOLDER
+from opera_vlm.errors import AlgorithmError, InputValidationError
+from opera_vlm.stack import GeometryStack, Grid
 
 logger = logging.getLogger(__name__)
 
 #: Set to False once run_algorithm is implemented.
-IS_PLACEHOLDER = True
+IS_PLACEHOLDER = False
+
+#: Posting of the GNSS field before it is interpolated to the product grid.
+GNSS_POSTING_METERS = 1000.0
+#: Rows processed at a time (memory: window epochs x rows x columns).
+ROW_BLOCK = 512
 
 
 @dataclass
 class AlgorithmResult:
-    """Output of `run_algorithm`.
+    """Output of `run_algorithm` for one target pair.
 
     Attributes
     ----------
@@ -64,31 +88,330 @@ class AlgorithmResult:
     ceos: dict[str, Any] = field(default_factory=dict)
 
 
-@log_runtime
-def run_algorithm(workflow: Workflow) -> AlgorithmResult:
-    """Run the algorithm for one job."""
+# --------------------------------------------------------------------- grids
+def warp(values: np.ndarray, src: Grid, dst: Grid) -> np.ndarray:
+    """Bilinear resampling of `values` from `src` to `dst` (NaN = no data)."""
+    if src.same_as(dst):
+        return values
+    from rasterio.warp import Resampling, reproject
+
+    out = np.full(dst.shape, np.nan)
+    reproject(
+        np.asarray(values, dtype=np.float64),
+        out,
+        src_transform=src.transform,
+        src_crs=f"EPSG:{src.epsg}",
+        src_nodata=np.nan,
+        dst_transform=dst.transform,
+        dst_crs=f"EPSG:{dst.epsg}",
+        dst_nodata=np.nan,
+        resampling=Resampling.bilinear,
+    )
+    return out
+
+
+def coarse_grid(grid: Grid, posting: float) -> Grid:
+    """Build a regular grid of about `posting` metres whose centres span `grid`."""
+
+    def axis(v: np.ndarray) -> np.ndarray:
+        n = max(2, int(np.ceil(abs(v[-1] - v[0]) / posting)) + 1)
+        return np.linspace(v[0], v[-1], n)
+
+    return Grid(x=axis(grid.x), y=axis(grid.y), epsg=grid.epsg)
+
+
+def read_los(path: Path, dst: Grid) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """East, north, up LOS unit-vector components of a 3-band GeoTIFF on `dst`."""
+    import rasterio
+
+    with rasterio.open(path) as ds:
+        if ds.count < 3:
+            raise InputValidationError(
+                f"{path.name}: expected 3 bands (east, north, up), got {ds.count}",
+                1003,
+            )
+        enu = ds.read([1, 2, 3]).astype(np.float64)
+        nodata = ds.nodata
+        t = ds.transform
+        x = t.c + t.a * (np.arange(ds.width) + 0.5)
+        y = t.f + t.e * (np.arange(ds.height) + 0.5)
+        src = Grid(x=x, y=y, epsg=int(ds.crs.to_epsg()))
+    if nodata is not None and np.isfinite(nodata):
+        enu[enu == nodata] = np.nan
+    enu[:, ~np.isfinite(enu).all(axis=0)] = np.nan
+    e, n, u = (warp(c, src, dst) for c in enu)
+    return e, n, u
+
+
+# ---------------------------------------------------------------- targets
+def target_epochs(stacks: list[GeometryStack], spacing_days: float) -> list[datetime]:
+    """Targets every `spacing_days` over the span all `stacks` cover."""
+    start = max(np.datetime64(s.dates[0], "s") for s in stacks)
+    end = min(np.datetime64(s.dates[-1], "s") for s in stacks)
+    t0 = start.astype(datetime)
+    t1 = end.astype(datetime)
+    out = []
+    t = t0
+    while t <= t1:
+        out.append(t)
+        t += timedelta(days=spacing_days)
+    if len(out) < 2:
+        raise InputValidationError(
+            f"the stacks overlap from {t0:%Y-%m-%d} to {t1:%Y-%m-%d}: fewer than two"
+            f" target epochs at {spacing_days:g}-day spacing",
+            1003,
+        )
+    return out
+
+
+def resample_at(
+    stack: GeometryStack, target: datetime, workflow: Workflow
+) -> tuple[np.ndarray, np.ndarray]:
+    """Window-fit value and sigma (meters) of `stack` at `target`, full frame.
+
+    The sigma includes the DISP-CAL ``calibration_std`` of the epoch nearest
+    the target (module docstring).
+    """
+    from venti.temporal import resample_timeseries
+
+    opts = workflow.algorithm_parameters.temporal_options
+    epochs = stack.epochs_within(target, opts.window_days / 2.0)
+    ny, nx = stack.grid.shape
+    value = np.full((ny, nx), np.nan)
+    sigma = np.full((ny, nx), np.nan)
+    if len(epochs) < opts.min_points:
+        return value, sigma
+    dates = np.array(epochs, dtype="datetime64[s]")
+    nearest = stack.nearest_epoch(target)
+    for r0 in range(0, ny, ROW_BLOCK):
+        rows = slice(r0, min(r0 + ROW_BLOCK, ny))
+        ts = stack.read_cumulative(epochs, rows)
+        v, s = resample_timeseries(
+            ts,
+            dates,
+            np.array([target], dtype="datetime64[s]"),
+            opts.window_days,
+            opts.method,
+            min_points=opts.min_points,
+            max_extrapolation_days=opts.max_extrapolation_days,
+        )
+        s_cal = stack.read_calibration_std(nearest, rows)
+        value[rows] = v[0]
+        sigma[rows] = np.sqrt(s[0] ** 2 + s_cal**2)
+    return value, sigma
+
+
+# ------------------------------------------------------------------- GNSS
+def load_gnss(workflow: Workflow, stacks: list[GeometryStack], grid: Grid):
+    """GNSS E/N/U velocity field (mm/yr) on `grid`, verified against DISP-CAL."""
+    from venti.gnss.sampling import GnssGridConfig
+    from venti.gnss.vlm import (
+        ProvenanceMismatchError,
+        ProvenanceMissingError,
+        load_gnss_for_vlm,
+    )
+
+    opts = workflow.algorithm_parameters.gnss_options
+    inputs = workflow.input_file_group
+    cal_products = [p.cal for s in stacks for p in s.pairs]
+    exclude, db_version = None, None
+    if opts.exclude_defo_nodes:
+        exclude, db_version = _defo_areas(workflow)
+    grid_cfg = None
+    if inputs.unr_grid_latlon_file is not None and inputs.unr_timeseries_dir:
+        grid_cfg = GnssGridConfig(
+            grid_lookup=inputs.unr_grid_latlon_file,
+            station_dir=inputs.unr_timeseries_dir,
+            utm_epsg=grid.epsg,
+            buffer_meters=opts.buffer_meters,
+            exclude_defo_nodes=opts.exclude_defo_nodes,
+            reinterpolate_excluded=opts.reinterpolate_excluded,
+        )
+    elif opts.horizontal_source == "grid" or not _has_gnss_layers(cal_products[0]):
+        raise InputValidationError(
+            "no GNSS horizontal field: give unr_grid_latlon_file and"
+            " unr_timeseries_dir (the DISP-CAL products carry no gnss_ve/gnss_vn"
+            f" layers, or horizontal_source is {opts.horizontal_source!r})",
+            1003,
+        )
+    try:
+        return load_gnss_for_vlm(
+            cal_products,
+            grid_cfg,  # type: ignore[arg-type]  # None only when the products carry layers
+            (grid.x, grid.y),
+            exclude=exclude,
+            defo_db_version=db_version,
+            allow_missing_provenance=not opts.require_provenance_match,
+        )
+    except (ProvenanceMismatchError, ProvenanceMissingError) as e:
+        raise InputValidationError(str(e), 1003) from e
+
+
+def _has_gnss_layers(cal_product: Path) -> bool:
+    import h5py
+
+    with h5py.File(cal_product, "r") as f:
+        return "gnss_ve" in f and "gnss_vn" in f
+
+
+def _defo_areas(workflow: Workflow) -> tuple[list, str | None]:
+    import json
+
+    from shapely.geometry import shape
+
+    path = workflow.static_ancillary_file_group.defo_area_db_json
+    if path is None:
+        raise InputValidationError(
+            "gnss_options.exclude_defo_nodes needs"
+            " static_ancillary_file_group.defo_area_db_json",
+            1003,
+        )
+    db = json.loads(Path(path).read_text())
+    geoms = [shape(f["geometry"]) for f in db["features"]]
+    versions = {f.get("properties", {}).get("version") for f in db["features"]}
+    versions.discard(None)
+    return geoms, ",".join(sorted(map(str, versions))) or None
+
+
+# ------------------------------------------------------------- the run
+def _ceos_runtime(
+    stacks: list[GeometryStack], los: list[tuple[np.ndarray, ...]]
+) -> dict[str, Any]:
+    import h5py
+
+    satellites: set[str] = set()
+    for s in stacks:
+        with h5py.File(s.pairs[0].disp, "r") as f:
+            names = f.get("identification/source_data_satellite_names")
+            if names is not None:
+                value = names[()]
+                text = value.decode() if isinstance(value, bytes) else str(value)
+                satellites.update(t.strip() for t in text.split(",") if t.strip())
+    inc = []
+    for _, _, u in los:
+        ok = np.isfinite(u)
+        if ok.any():
+            inc.append(np.degrees(np.arccos(np.clip(np.abs(u[ok]), 0, 1))))
+    angles = np.concatenate(inc) if inc else np.array([np.nan])
+    return {
+        "source_data_satellite_names": ", ".join(sorted(satellites)) or "unknown",
+        "orbit_pass_direction": ", ".join(s.name.capitalize() for s in stacks),
+        "near_range_incidence_angle": float(np.nanmin(angles)),
+        "far_range_incidence_angle": float(np.nanmax(angles)),
+    }
+
+
+def _stacks(workflow: Workflow) -> list[GeometryStack]:
+    from venti.sensor import sensor_for_file
+
+    inputs = workflow.input_file_group
+    layer = sensor_for_file(inputs.ascending_disp_files[0]).displacement_layer
+    stacks = [
+        GeometryStack(
+            inputs.ascending_disp_files,
+            inputs.ascending_cal_files,
+            displacement_layer=layer,
+            name="ascending",
+        )
+    ]
+    if inputs.descending_disp_files:
+        if workflow.dynamic_ancillary_file_group.los_file_descending is None:
+            raise InputValidationError(
+                "descending inputs need"
+                " dynamic_ancillary_file_group.los_file_descending",
+                1003,
+            )
+        stacks.append(
+            GeometryStack(
+                inputs.descending_disp_files,
+                inputs.descending_cal_files,
+                displacement_layer=layer,
+                name="descending",
+            )
+        )
+    return stacks
+
+
+def run_algorithm(workflow: Workflow) -> Iterator[AlgorithmResult]:
+    """Yield one `AlgorithmResult` per target pair ``(T0, Tk)``."""
+    from venti.decomposition import decompose
+    from venti.gnss.vlm import pair_displacement
+
     params = workflow.algorithm_parameters
     logger.info("Algorithm parameters:\n%s", params.to_yaml_str())
+    if workflow.output_options.get("write_velocity_product"):
+        raise AlgorithmError(
+            "output_options.write_velocity_product is not implemented yet (plan T56)"
+        )
+    dec = params.decomposition_options
 
-    # TODO(sas): replace from here -------------------------------------------
-    logger.warning("PLACEHOLDER algorithm: the product contains no science")
-    ny, nx, posting = 64, 64, 30.0
-    x = 500_000.0 + posting * (np.arange(nx) + 0.5)
-    y = 4_000_000.0 - posting * (np.arange(ny) + 0.5)
-    layers = xr.Dataset(
-        {
-            spec.name: (("y", "x"), np.zeros((ny, nx), dtype=spec.dtype))
-            for spec in LAYERS
-        },
-        coords={"x": x, "y": y},
-        attrs={"epsg": 32611},
+    stacks = _stacks(workflow)
+    grid = stacks[0].grid
+    dyn = workflow.dynamic_ancillary_file_group
+    los_files = [dyn.los_file_ascending, dyn.los_file_descending][: len(stacks)]
+    los = [read_los(Path(p), grid) for p in los_files]  # type: ignore[arg-type]
+    targets = target_epochs(stacks, params.temporal_options.target_spacing_days)
+    logger.info(
+        "%s; %d target epochs %s .. %s every %g days",
+        ", ".join(f"{s.name}: {len(s.pairs)} pairs" for s in stacks),
+        len(targets),
+        f"{targets[0]:%Y-%m-%d}",
+        f"{targets[-1]:%Y-%m-%d}",
+        params.temporal_options.target_spacing_days,
     )
-    return AlgorithmResult(
-        layers=layers,
-        reference_datetime=datetime(2020, 1, 1),
-        secondary_datetime=datetime(2020, 1, 13),
-        source_files=[],
-        # `opera-vlm ceos check` reports these as "placeholder" until real values
-        ceos={f.name: PLACEHOLDER for f in CEOS_FIELDS if f.source == "runtime"},
-    )
-    # TODO(sas): ... to here --------------------------------------------------
+
+    coarse = coarse_grid(grid, GNSS_POSTING_METERS)
+    gnss = load_gnss(workflow, stacks, coarse)
+    ceos = _ceos_runtime(stacks, los)
+    sources = [f for s in stacks for f in s.source_files]
+    at_t0 = [resample_at(s, targets[0], workflow) for s in stacks]
+
+    for tk in targets[1:]:
+        looks, sigmas = [], []
+        for s, (v0, s0) in zip(stacks, at_t0, strict=True):
+            vk, sk = resample_at(s, tk, workflow)
+            d = vk - v0
+            sig = np.sqrt(s0**2 + sk**2 + dec.sigma_disp_meters**2)
+            looks.append(warp(d, s.grid, grid))
+            sigmas.append(warp(sig, s.grid, grid))
+        g = pair_displacement(gnss, targets[0], tk)
+        mm = 1e-3  # the UNR grid is in mm
+        de, dn = (warp(g[k] * mm, coarse, grid) for k in ("de", "dn"))
+        sde, sdn = (
+            warp(np.nan_to_num(g[k]) * mm, coarse, grid)
+            for k in ("sigma_de", "sigma_dn")
+        )
+        res = decompose(
+            looks,
+            sigmas,
+            los,
+            de,
+            dn,
+            sigma_east_gnss=sde,
+            sigma_north_gnss=sdn,
+            cond_max=dec.cond_max,
+            min_up=dec.min_up,
+        )
+        logger.info("%s_%s: %s", f"{targets[0]:%Y%m%d}", f"{tk:%Y%m%d}", res.counts())
+        layers = xr.Dataset(
+            {
+                "vertical": (("y", "x"), res.up),
+                "vertical_std": (("y", "x"), res.sigma_up),
+                "east": (("y", "x"), res.east),
+                "east_std": (("y", "x"), res.sigma_east),
+                "mode": (("y", "x"), res.mode),
+            },
+            coords={"x": grid.x, "y": grid.y},
+            attrs={"epsg": grid.epsg},
+        )
+        yield AlgorithmResult(
+            layers=layers,
+            reference_datetime=targets[0],
+            secondary_datetime=tk,
+            source_files=sources,
+            identification={
+                "gnss_provenance_digest": gnss.provenance.digest,
+                "number_of_looks": len(stacks),
+            },
+            ceos=ceos,
+        )

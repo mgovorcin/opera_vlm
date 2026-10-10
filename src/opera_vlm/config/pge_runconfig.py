@@ -43,6 +43,7 @@ PATH_INPUTS: tuple[tuple[str, str, str], ...] = (
     ("input_file_group", "unr_timeseries_dir", "dir"),
     ("dynamic_ancillary_file_group", "los_file_ascending", "file"),
     ("dynamic_ancillary_file_group", "los_file_descending", "file"),
+    ("static_ancillary_file_group", "defo_area_db_json", "file"),
     ("static_ancillary_file_group", "gia_model_file", "file"),
 )
 

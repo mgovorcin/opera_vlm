@@ -17,7 +17,6 @@ from opera_vlm.product._ceos import (
     CEOS_STATIC,
     check_compliance,
     compliance_matrix,
-    is_compliant,
 )
 
 DOC = Path(__file__).parents[1] / "docs" / "ceos-compliance.md"
@@ -44,7 +43,7 @@ def test_matrix_doc_is_current():
 
 def test_product_ceos_fields(runconfig_file: Path):
     rc = RunConfig.from_yaml_file(runconfig_file)
-    product = run(rc.to_workflow())
+    product = run(rc.to_workflow())[-1]
     status = {f.name: s for f, s in check_compliance(product)}
     for f in CEOS_FIELDS:
         if f.source == "computed":
@@ -52,12 +51,5 @@ def test_product_ceos_fields(runconfig_file: Path):
         elif f.source == "static":
             expected = "ok" if CEOS_STATIC.get(f.name) not in ("", None) else "missing"
             assert status[f.name] == expected, f.name
-    from opera_vlm.algorithm import IS_PLACEHOLDER
-
-    if IS_PLACEHOLDER:  # runtime fields are placeholders until the algorithm exists
-        assert all(
-            status[f.name] == "placeholder"
-            for f in CEOS_FIELDS
-            if f.source == "runtime"
-        )
-        assert not is_compliant(check_compliance(product))
+    # runtime fields come from the inputs (satellites, orbit, incidence angles)
+    assert all(status[f.name] == "ok" for f in CEOS_FIELDS if f.source == "runtime")

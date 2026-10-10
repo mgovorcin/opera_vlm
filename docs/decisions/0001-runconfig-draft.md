@@ -23,8 +23,15 @@
      fails otherwise. `gnss_options.buffer_meters` (50 km),
      `exclude_defo_nodes` and `reinterpolate_excluded` mirror DISP-CAL's
      options so the check can pass.
-3. **The mode is per pixel:** 0 none, 1 projected (one look), 2 decomposed
-   (both looks).
+3. **The mode is per pixel:** 0 none, 1 decomposed (WLS, both looks),
+   2 projected (one look, or both looks ill-conditioned). These are
+   `venti.decomposition`'s `MODE_WLS` and `MODE_PROJECTION`; an earlier draft
+   of this record had 1 and 2 swapped.
+4. **One run, one product per target pair** (T56.2, 2026-10-10, for owner
+   review). A run takes the whole asc/desc stacks and writes a product for
+   every target pair `(T0, Tk)`: `T0` is the first target epoch, targets are
+   every `temporal_options.target_spacing_days` over the span both geometries
+   cover. Like DISP-S1, every product of a run shares its reference date.
 
 ## To be frozen at VLM v0.1 (T57)
 

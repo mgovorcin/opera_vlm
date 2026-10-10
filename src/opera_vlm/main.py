@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 @log_runtime
-def run(workflow: Workflow, pge_runconfig: str | None = None) -> Path:
-    """Run the algorithm, write the product and its browse image.
+def run(workflow: Workflow, pge_runconfig: str | None = None) -> list[Path]:
+    """Run the algorithm, write each product and its browse image.
 
     Logging is configured by the caller (the CLI), so this is also usable
     from notebooks and tests.
@@ -33,8 +33,8 @@ def run(workflow: Workflow, pge_runconfig: str | None = None) -> Path:
 
     Returns
     -------
-    Path
-        The product file.
+    list of Path
+        One product per target pair, in time order.
 
     """
     from opera_vlm.algorithm import run_algorithm
@@ -45,24 +45,31 @@ def run(workflow: Workflow, pge_runconfig: str | None = None) -> Path:
     scratch_existed = workflow.work_directory.exists()
     workflow.create_directories()
 
-    try:
-        result = run_algorithm(workflow)
-    except SasError:
-        raise
-    except Exception as e:
-        raise AlgorithmError(f"Algorithm failed: {e}") from e
-
-    product = write_product(workflow, result, pge_runconfig, processing_start)
-    try:
-        png = make_browse_image(product, LAYERS[0].name, product.with_suffix(".png"))
-        logger.info("Browse image: %s", png)
-    except Exception as e:
-        raise ProductError(f"Browse image failed: {e}") from e
+    products = []
+    results = run_algorithm(workflow)
+    while True:
+        try:
+            result = next(results, None)
+        except SasError:
+            raise
+        except Exception as e:
+            raise AlgorithmError(f"Algorithm failed: {e}") from e
+        if result is None:
+            break
+        product = write_product(workflow, result, pge_runconfig, processing_start)
+        try:
+            png = make_browse_image(
+                product, LAYERS[0].name, product.with_suffix(".png")
+            )
+            logger.info("Browse image: %s", png)
+        except Exception as e:
+            raise ProductError(f"Browse image failed: {e}") from e
+        products.append(product)
 
     # Only remove a scratch directory this run created: never a user directory
     if not workflow.keep_scratch and not scratch_existed:
         shutil.rmtree(workflow.work_directory, ignore_errors=True)
 
-    logger.info("Product: %s", product)
+    logger.info("%d products in %s", len(products), workflow.output_directory)
     logger.info("Maximum memory usage: %.2f GB", get_max_memory_usage(units="GB"))
-    return product
+    return products

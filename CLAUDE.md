@@ -39,6 +39,23 @@ src/opera_vlm/
   COMPLIANT on the golden product before a delivery.
 - `run` reads only files listed in the runconfig: no network, no hidden paths.
 
+VLM science (Venti PRD section 3.2, D15; plan T52.1):
+
+- **North always comes from GNSS.** Two LOS geometries cannot resolve three
+  components; the WLS solves east and up with north fixed from the GNSS grid.
+- **The GNSS horizontal field must be the one DISP-CAL used.** With
+  `horizontal_source: cal_product` the run reads DISP-CAL's `gnss_ve/gnss_vn`;
+  with `grid` it samples the frozen UNR snapshot with Venti. Either way the
+  provenance digest must match the one recorded in the DISP-CAL products
+  (`require_provenance_match`), or the run fails.
+- **Every pixel carries a mode flag** (`mode`: 0 none, 1 asc+desc WLS, 2
+  single-geometry projection). Projected pixels are valid for long-wavelength
+  horizontal motion only, and the product says so.
+- **One codebase, two products.** VLM-S1 (DISP-S1) and VLM-NI (DISP-NISAR)
+  differ only through Venti's `SensorSpec`; no sensor constants in this repo.
+- The science lives in Venti (`venti.decomposition`, `venti.temporal`); this
+  repo is the interface, product and validation layer around it.
+
 ## Commands
 
 ```bash

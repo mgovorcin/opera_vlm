@@ -181,6 +181,12 @@ def resample_at(
     sigma = np.full((ny, nx), np.nan)
     if len(epochs) < opts.min_points:
         return value, sigma
+    logger.info(
+        "%s at %s: %d epochs in the window",
+        stack.name,
+        f"{target:%Y-%m-%d}",
+        len(epochs),
+    )
     dates = np.array(epochs, dtype="datetime64[s]")
     nearest = stack.nearest_epoch(target)
     for r0 in range(0, ny, ROW_BLOCK):
@@ -393,7 +399,8 @@ def run_algorithm(workflow: Workflow) -> Iterator[AlgorithmResult]:
     sources = [f for s in stacks for f in s.source_files]
     at_t0 = [resample_at(s, targets[0], workflow) for s in stacks]
 
-    for tk in targets[1:]:
+    for k, tk in enumerate(targets[1:], 1):
+        logger.info("target pair %d/%d: %s", k, len(targets) - 1, f"{tk:%Y-%m-%d}")
         looks, sigmas = [], []
         for s, (v0, s0) in zip(stacks, at_t0, strict=True):
             vk, sk = resample_at(s, tk, workflow)

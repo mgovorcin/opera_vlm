@@ -59,6 +59,16 @@ class DecompositionOptions(YamlModel):
         ),
     )
 
+    sigma_rate_meters_per_year: float = Field(
+        default=0.0015,
+        ge=0,
+        description=(
+            "Per-look error growing with the pair's span, added as (rate x years) in "
+            "quadrature: chained per-pair calibration leaves a rate error at every "
+            "pixel (T57, fitted on LA F16940 + F18904: 1.5 mm/yr). Units: meters/year."
+        ),
+    )
+
     model_config = STRICT_CONFIG
 
 

@@ -36,7 +36,9 @@
    `sigma^2 = s_fit(T0)^2 + s_fit(Tk)^2 + s_cal(T0)^2 + s_cal(Tk)^2 + sigma_disp^2`.
    `sigma_disp` is the per-point DISP noise from TS-S1: 7 mm by default,
    per frame in the dated static overrides file (3.9-6.8 mm on the four
-   T38 frames).
+   T38 frames). Plus `(sigma_rate x (Tk - T0))^2` (2026-10-12): chained
+   per-pair calibration leaves a per-pixel rate error, so the real error
+   grows with the span; 1.5 mm/yr per look, fitted on LA real data (T57).
 6. **Masks.** `input_options.mask_layers` (default `water_mask`) is applied
    to every pair before chaining.
 

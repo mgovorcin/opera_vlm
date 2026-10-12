@@ -172,6 +172,22 @@ def test_target_epochs_cover_the_common_span(frame):
         target_epochs([asc, desc], 400.0)
 
 
+def test_first_target_needs_every_geometry(frame, caplog):
+    """A geometry without enough epochs at T0 would be lost from every product:
+    the first target moves to the first epoch where both have data."""
+    asc = GeometryStack(frame.asc_disp, frame.asc_cal)
+    desc = GeometryStack(frame.desc_disp, frame.desc_cal, name="descending")
+    # +-20 days around the descending start (2020-01-07) holds only 2
+    # descending epochs; the first epoch with 3 of each look is the ascending
+    # 2020-01-13 (desc 01-07, 01-19, 01-31; asc 01-01, 01-13, 01-25)
+    t = target_epochs([asc, desc], 12.0, window_days=40.0, min_points=3)
+    assert t[0] == datetime(2020, 1, 13)
+    assert "first target moved" in caplog.text
+    assert target_epochs([asc, desc], 12.0, 40.0, 1)[0] == datetime(2020, 1, 7)
+    with pytest.raises(InputValidationError, match="no epoch"):
+        target_epochs([asc, desc], 12.0, window_days=1.0, min_points=3)
+
+
 def test_warp_and_coarse_grid():
     """The two warps a run does are exact on a plane: coarse GNSS -> product
     grid (the coarse centres span the product grid), and a shifted grid of the

@@ -158,12 +158,48 @@ def read_los(path: Path, dst: Grid) -> tuple[np.ndarray, np.ndarray, np.ndarray]
 
 
 # ---------------------------------------------------------------- targets
-def target_epochs(stacks: list[GeometryStack], spacing_days: float) -> list[datetime]:
-    """Targets every `spacing_days` over the span all `stacks` cover."""
+def target_epochs(
+    stacks: list[GeometryStack],
+    spacing_days: float,
+    window_days: float | None = None,
+    min_points: int = 1,
+) -> list[datetime]:
+    """Targets every `spacing_days` over the span all `stacks` cover.
+
+    With `window_days`, the first target (the reference of every product) is
+    the first epoch at which every stack has `min_points` epochs within
+    ``window_days / 2``: a geometry with no value at ``T0`` would be missing
+    from every product of the run (NYC F30175, 2019).
+    """
     start = max(np.datetime64(s.dates[0], "s") for s in stacks)
     end = min(np.datetime64(s.dates[-1], "s") for s in stacks)
     t0 = start.astype(datetime)
     t1 = end.astype(datetime)
+    if window_days is not None:
+        half = window_days / 2.0
+        candidates = sorted(
+            {t for s in stacks for t in s.dates.astype(datetime) if t0 <= t <= t1}
+        )
+        ok = [
+            t
+            for t in candidates
+            if all(len(s.epochs_within(t, half)) >= min_points for s in stacks)
+        ]
+        if not ok:
+            raise InputValidationError(
+                f"no epoch from {t0:%Y-%m-%d} to {t1:%Y-%m-%d} has {min_points}"
+                f" epochs of every geometry within {window_days:g} days",
+                1003,
+            )
+        if ok[0] != t0:
+            logger.warning(
+                "first target moved from %s to %s: before it a geometry has fewer"
+                " than %d epochs in the window",
+                f"{t0:%Y-%m-%d}",
+                f"{ok[0]:%Y-%m-%d}",
+                min_points,
+            )
+        t0 = ok[0]
     out = []
     t = t0
     while t <= t1:
@@ -194,6 +230,14 @@ def resample_at(
     value = np.full((ny, nx), np.nan)
     sigma = np.full((ny, nx), np.nan)
     if len(epochs) < opts.min_points:
+        logger.warning(
+            "%s at %s: %d epochs in the window (< %d): no %s look for this target",
+            stack.name,
+            f"{target:%Y-%m-%d}",
+            len(epochs),
+            opts.min_points,
+            stack.name,
+        )
         return value, sigma
     logger.info(
         "%s at %s: %d epochs in the window",
@@ -396,7 +440,10 @@ def run_algorithm(workflow: Workflow) -> Iterator[AlgorithmResult]:
     dyn = workflow.dynamic_ancillary_file_group
     los_files = [dyn.los_file_ascending, dyn.los_file_descending][: len(stacks)]
     los = [read_los(Path(p), grid) for p in los_files]  # type: ignore[arg-type]
-    targets = target_epochs(stacks, params.temporal_options.target_spacing_days)
+    topts = params.temporal_options
+    targets = target_epochs(
+        stacks, topts.target_spacing_days, topts.window_days, topts.min_points
+    )
     logger.info(
         "%s; %d target epochs %s .. %s every %g days",
         ", ".join(f"{s.name}: {len(s.pairs)} pairs" for s in stacks),

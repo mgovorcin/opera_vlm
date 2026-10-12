@@ -169,7 +169,9 @@ def target_epochs(
     With `window_days`, the first target (the reference of every product) is
     the first epoch at which every stack has `min_points` epochs within
     ``window_days / 2``: a geometry with no value at ``T0`` would be missing
-    from every product of the run (NYC F30175, 2019).
+    from every product of the run (NYC F30175, 2019). Later targets where a
+    stack has too few epochs are dropped (no product): a gap in the
+    acquisitions, e.g. no DISP in snow season (Montana F40308 / F07081).
     """
     start = max(np.datetime64(s.dates[0], "s") for s in stacks)
     end = min(np.datetime64(s.dates[-1], "s") for s in stacks)
@@ -201,10 +203,22 @@ def target_epochs(
             )
         t0 = ok[0]
     out = []
+    dropped = []
     t = t0
     while t <= t1:
-        out.append(t)
+        if window_days is None or all(
+            len(s.epochs_within(t, window_days / 2.0)) >= min_points for s in stacks
+        ):
+            out.append(t)
+        else:
+            dropped.append(t)
         t += timedelta(days=spacing_days)
+    if dropped:
+        logger.warning(
+            "%d target(s) without enough epochs of every geometry are skipped: %s",
+            len(dropped),
+            ", ".join(f"{d:%Y-%m-%d}" for d in dropped),
+        )
     if len(out) < 2:
         raise InputValidationError(
             f"the stacks overlap from {t0:%Y-%m-%d} to {t1:%Y-%m-%d}: fewer than two"

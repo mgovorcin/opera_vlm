@@ -188,6 +188,23 @@ def test_first_target_needs_every_geometry(frame, caplog):
         target_epochs([asc, desc], 12.0, window_days=1.0, min_points=3)
 
 
+def test_targets_in_an_acquisition_gap_are_skipped(frame, caplog):
+    """No product where a look has no epochs (e.g. snow season): drop the
+    descending 2020-02-12 and 2020-02-24 (inside the first block), so from
+    2020-01-31 to 2020-03-07 it has nothing within +-7 days of mid-February."""
+    from opera_vlm.stack import pair_dates
+
+    gap = {datetime(2020, 2, 12), datetime(2020, 2, 24)}
+    disp = [p for p in frame.desc_disp if pair_dates(p)[1] not in gap]
+    assert len(disp) == len(frame.desc_disp) - 2
+    desc = GeometryStack(disp, frame.desc_cal, name="descending")
+    asc = GeometryStack(frame.asc_disp, frame.asc_cal)
+    t = target_epochs([asc, desc], 6.0, window_days=14.0, min_points=1)
+    assert all(len(desc.epochs_within(x, 7.0)) >= 1 for x in t)
+    assert not any(datetime(2020, 2, 12) <= x <= datetime(2020, 2, 25) for x in t)
+    assert "skipped" in caplog.text
+
+
 def test_warp_and_coarse_grid():
     """The two warps a run does are exact on a plane: coarse GNSS -> product
     grid (the coarse centres span the product grid), and a shifted grid of the

@@ -25,10 +25,12 @@ descending frame) and yields one `AlgorithmResult` per target pair
 Per-look sigma of the pair (v0.1 model)::
 
     sigma^2 = s_fit(T0)^2 + s_fit(Tk)^2 + s_cal(T0)^2 + s_cal(Tk)^2 + sigma_disp^2
+              + (sigma_rate * (Tk - T0))^2
 
 ``s_fit`` is the window-fit standard error, ``s_cal`` the DISP-CAL
 ``calibration_std`` of the epoch nearest the target and ``sigma_disp`` the
-DISP noise below the calibration cutoff (TS-S1, a placeholder parameter).
+DISP noise below the calibration cutoff (TS-S1) and ``sigma_rate`` the rate
+error chained per-pair calibration leaves (T57, fitted on LA real data).
 """
 
 from __future__ import annotations
@@ -480,7 +482,14 @@ def run_algorithm(workflow: Workflow) -> Iterator[AlgorithmResult]:
         for s, (v0, s0) in zip(stacks, at_t0, strict=True):
             d, sig = resample_at(s, tk, workflow)
             d -= v0  # in place: the pair R(Tk) - R(T0)
-            np.sqrt(s0**2 + sig**2 + dec.sigma_disp_meters**2, out=sig)
+            span = (tk - targets[0]).days / 365.25
+            np.sqrt(
+                s0**2
+                + sig**2
+                + dec.sigma_disp_meters**2
+                + (dec.sigma_rate_meters_per_year * span) ** 2,
+                out=sig,
+            )
             looks.append(d)
             sigmas.append(sig)
         g = pair_displacement(gnss, targets[0], tk)

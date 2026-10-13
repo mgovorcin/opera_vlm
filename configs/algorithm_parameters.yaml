@@ -22,6 +22,11 @@ decomposition_options:
   #     the static overrides file. Units: meters.
   #   Type: number.
   sigma_disp_meters: 0.007
+  # Per-look error growing with the pair's span, added as (rate x years) in quadrature:
+  #     chained per-pair calibration leaves a rate error at every pixel (T57, fitted on LA
+  #     F16940 + F18904: 1.5 mm/yr). Units: meters/year.
+  #   Type: number.
+  sigma_rate_meters_per_year: 0.0015
 # Resampling asc and desc onto common epochs (venti.temporal).
 #   Type: Object.
 temporal_options:

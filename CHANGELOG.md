@@ -16,6 +16,10 @@ tags (setuptools_scm). Mark entries that change product values with **[product]*
 - **[product]** `decomposition_options.sigma_disp_meters` default 0.01 ->
   0.007 m (TS-S1 per-point DISP noise); per-frame values in
   `configs/static/opera-vlm-algorithm-parameters-overrides-2026-10-10.json`.
+- **[product]** `decomposition_options.sigma_rate_meters_per_year` (default
+  0.0015): per-look sigma grows as (rate x span) in quadrature. Fitted on LA
+  (F16940 + F18904) GNSS residuals: robust z spread flat at ~0.9 across 0.5-7
+  yr spans (was 0.87 -> 1.52), coverage 78% -> 85% (T57).
 - **[product]** `input_options.mask_layers` (default `["water_mask"]`): DISP
   masks applied to every pair before chaining.
 - `static_ancillary_file_group.defo_area_db_json` (optional): the deforming-area

@@ -205,6 +205,23 @@ def test_targets_in_an_acquisition_gap_are_skipped(frame, caplog):
     assert "skipped" in caplog.text
 
 
+def test_sigma_grows_with_the_span(frame, tmp_path):
+    """T57: chained per-pair calibration leaves a rate error, so sigma grows
+    with (Tk - T0); with sigma_rate 0 it does not."""
+
+    def sigmas(rate: float) -> list[float]:
+        params = AlgorithmParameters().with_overrides(
+            {"decomposition_options": {"sigma_rate_meters_per_year": rate}}
+        )
+        results = list(run_algorithm(_workflow(frame, tmp_path, params)))
+        return [float(np.nanmedian(r.layers["vertical_std"].values)) for r in results]
+
+    flat, growing = sigmas(0.0), sigmas(0.05)  # 50 mm/yr: dominant, easy to see
+    assert growing[-1] > 2 * growing[0]
+    assert max(flat) < 1.2 * min(flat)
+    assert all(g >= f for g, f in zip(growing, flat, strict=True))
+
+
 def test_warp_and_coarse_grid():
     """The two warps a run does are exact on a plane: coarse GNSS -> product
     grid (the coarse centres span the product grid), and a shifted grid of the

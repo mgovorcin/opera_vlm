@@ -17,7 +17,7 @@ from opera_vlm.validate import compare_products
 
 def _product(runconfig_file: Path) -> Path:
     rc = RunConfig.from_yaml_file(runconfig_file)
-    return run(rc.to_workflow(), pge_runconfig=runconfig_file.read_text())
+    return run(rc.to_workflow(), pge_runconfig=runconfig_file.read_text())[-1]
 
 
 def test_product_structure(runconfig_file: Path):

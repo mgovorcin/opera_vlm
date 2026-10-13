@@ -7,7 +7,7 @@
 #   configs/runconfig.yaml      paths relative to DIR
 #   configs/algorithm_parameters.yaml
 #   input_data/                 every input the runconfig lists
-#   golden_output/              exactly one golden product (+ .png)
+#   golden_output/              the golden products, one per target pair (+ .png)
 #   output/                     test products land here
 #
 # Exit codes: 0 passed, 1 failed (run error or product mismatch).
@@ -28,9 +28,9 @@ done
 [[ -n "$GOLDEN_DIR" ]] || { echo "ERROR: --golden-dir is required" >&2; exit 1; }
 GOLDEN_DIR="$(realpath "$GOLDEN_DIR")"
 
-mapfile -t GOLDEN < <(find "$GOLDEN_DIR/golden_output" -maxdepth 1 -name 'OPERA_*.nc' -type f)
-if [[ "${#GOLDEN[@]}" -ne 1 ]]; then
-    echo "ERROR: expected exactly one golden product in $GOLDEN_DIR/golden_output" >&2
+mapfile -t GOLDEN < <(find "$GOLDEN_DIR/golden_output" -maxdepth 1 -name 'OPERA_*.nc' -type f | sort)
+if [[ "${#GOLDEN[@]}" -eq 0 ]]; then
+    echo "ERROR: no golden product in $GOLDEN_DIR/golden_output" >&2
     exit 1
 fi
 
@@ -40,8 +40,22 @@ mkdir -p "$GOLDEN_DIR/output"
 echo "[1/2] Running opera-vlm on the golden inputs"
 (cd "$GOLDEN_DIR" && opera-vlm run configs/runconfig.yaml)
 
-mapfile -t TEST < <(find "$GOLDEN_DIR/output" -maxdepth 1 -name 'OPERA_*.nc' -type f)
-[[ "${#TEST[@]}" -eq 1 ]] || { echo "ERROR: run produced ${#TEST[@]} products" >&2; exit 1; }
+# products match on their name without the processing time (last field)
+key() { basename "$1" | sed -E 's/_[0-9]{8}T[0-9]{6}Z\.nc$//'; }
+mapfile -t TEST < <(find "$GOLDEN_DIR/output" -maxdepth 1 -name 'OPERA_*.nc' -type f | sort)
+if [[ "${#TEST[@]}" -ne "${#GOLDEN[@]}" ]]; then
+    echo "ERROR: run produced ${#TEST[@]} products, golden has ${#GOLDEN[@]}" >&2
+    exit 1
+fi
 
-echo "[2/2] Comparing $(basename "${TEST[0]}") with $(basename "${GOLDEN[0]}")"
-opera-vlm validate --rtol "$RTOL" --atol "$ATOL" "${GOLDEN[0]}" "${TEST[0]}"
+echo "[2/2] Comparing ${#GOLDEN[@]} products"
+status=0
+for i in "${!GOLDEN[@]}"; do
+    if [[ "$(key "${GOLDEN[$i]}")" != "$(key "${TEST[$i]}")" ]]; then
+        echo "ERROR: $(basename "${TEST[$i]}") has no golden counterpart" >&2
+        status=1
+        continue
+    fi
+    opera-vlm validate --rtol "$RTOL" --atol "$ATOL" "${GOLDEN[$i]}" "${TEST[$i]}" || status=1
+done
+exit "$status"

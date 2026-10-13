@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "created": "2026-10-10",
+    "author": "mgovorcin",
+    "description": "Per-frame_id algorithm parameter overrides. Keys under data are frame_id values (as strings).",
+    "reason": "sigma_disp_meters per frame from TS-S1 (disp2vlm_validation studies/TS-S1/REPORT.md): per-point DISP noise, pairs 10-50 km, troposphere uncorrected, 7 x 7 pixel medians (a lower bound for one pixel). Frames without an entry use the default (0.007 m)."
+  },
+  "data": {
+    "8882": {"decomposition_options": {"sigma_disp_meters": 0.0068}},
+    "8886": {"decomposition_options": {"sigma_disp_meters": 0.0039}},
+    "16940": {"decomposition_options": {"sigma_disp_meters": 0.0063}},
+    "8622": {"decomposition_options": {"sigma_disp_meters": 0.0049}}
+  }
+}

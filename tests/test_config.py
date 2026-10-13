@@ -119,3 +119,20 @@ def test_vlm_product_and_gnss_options_draft():
         GnssOptions(buffer_meters=-1)
     with pytest.raises(ValidationError):
         GnssOptions(unknown_option=1)
+
+
+def test_delivered_overrides_files_validate():
+    """Every dated static overrides file applies cleanly to the defaults."""
+    files = sorted(
+        (Path(__file__).parents[1] / "configs" / "static").glob(
+            "opera-vlm-algorithm-parameters-overrides-*.json"
+        )
+    )
+    assert files
+    for path in files:
+        data = json.loads(path.read_text())
+        assert data["metadata"]["reason"]
+        for frame, overrides in data["data"].items():
+            params = AlgorithmParameters().with_overrides(overrides)
+            assert int(frame) > 0
+            assert 0 < params.decomposition_options.sigma_disp_meters < 0.01

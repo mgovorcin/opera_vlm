@@ -49,7 +49,7 @@ def test_run_bad_runconfig_exit_code(tmp_path: Path):
 def test_run_end_to_end(runconfig_file: Path, tmp_path: Path):
     result = CliRunner().invoke(cli_app, ["run", str(runconfig_file)])
     assert result.exit_code == 0, result.output
-    products = list((tmp_path / "output").glob("OPERA_*.nc"))
-    assert len(products) == 1
-    assert products[0].with_suffix(".png").exists()
+    products = sorted((tmp_path / "output").glob("OPERA_*.nc"))
+    assert len(products) > 1  # one per target pair
+    assert all(p.with_suffix(".png").exists() for p in products)
     assert (tmp_path / "output" / "opera_vlm.log").exists()

@@ -23,12 +23,17 @@ tags (setuptools_scm). Mark entries that change product values with **[product]*
 - Synthetic asc/desc frame with known east/north/up (`tests/synthetic.py`) and
   a 128 x 128 regression test (plan T56.4).
 
+- Context layers (plan T56.3), never removed from the product:
+  `plate_motion_east_rate` / `plate_motion_north_rate` (rigid plate,
+  ITRF2020-PMM via `geepers.euler`; plate from Venti's frame table or
+  `context_options.plate`) and `gia_vertical_rate` (ICE-6G_D, when
+  `gia_model_file` is given). New `context_options` group.
+
 ### Changed
 - Venti pin a0fe190 -> d67c452 (venti-dev main: `venti.gnss.vlm`).
 
 ### Not yet
 - `output_options.write_velocity_product` fails with an algorithm error
   (exit 5) until the velocity-domain product is implemented.
-- Context layers (GIA, plate motion; T56.3) and the first real asc/desc
-  frame (T56.1).
+- The first real asc/desc frame (T56.1).
 - Initial scaffold (sas-scaffold).

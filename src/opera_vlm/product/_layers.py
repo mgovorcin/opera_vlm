@@ -27,6 +27,8 @@ class LayerSpec:
     #: Mantissa bits kept for lossy float compression (None = lossless).
     keep_bits: int | None = None
     fill_value: float | int = float("nan")
+    #: False for context layers that are written only when their input is given.
+    required: bool = True
 
     def attrs(self) -> dict[str, str]:
         """CF attributes of the layer."""
@@ -96,6 +98,39 @@ LAYERS: list[LayerSpec] = [
         keep_bits=None,
         fill_value=255,
     ),
+    LayerSpec(
+        name="plate_motion_east_rate",
+        dtype="float32",
+        units="meters / year",
+        description=(
+            "Context: east velocity of the frame's rigid plate (ITRF2020-PMM). East "
+            "minus this rate times the pair's span is plate-fixed. Not removed."
+        ),
+        long_name="plate motion east rate",
+        keep_bits=12,
+        required=False,
+    ),
+    LayerSpec(
+        name="plate_motion_north_rate",
+        dtype="float32",
+        units="meters / year",
+        description="Context: north velocity of the frame's rigid plate. Not removed.",
+        long_name="plate motion north rate",
+        keep_bits=12,
+        required=False,
+    ),
+    LayerSpec(
+        name="gia_vertical_rate",
+        dtype="float32",
+        units="meters / year",
+        description=(
+            "Context: vertical rate of the GIA model (ICE-6G_D), when one is given. "
+            "Not removed."
+        ),
+        long_name="GIA vertical rate",
+        keep_bits=12,
+        required=False,
+    ),
 ]
 
 
@@ -120,10 +155,16 @@ def round_mantissa(data: np.ndarray, keep_bits: int) -> np.ndarray:
     return out
 
 
-def encoding(compression: bool, chunks: tuple[int, int] = (256, 256)) -> dict:
-    """xarray/h5netcdf encoding for every layer."""
+def encoding(
+    compression: bool,
+    chunks: tuple[int, int] = (256, 256),
+    names: set[str] | None = None,
+) -> dict:
+    """xarray/h5netcdf encoding for every layer (or only those in `names`)."""
     enc: dict = {}
     for spec in LAYERS:
+        if names is not None and spec.name not in names:
+            continue
         e: dict = {"dtype": spec.dtype, "_FillValue": spec.fill_value}
         if compression:
             e.update(compression="gzip", compression_opts=4, shuffle=True)

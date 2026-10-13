@@ -51,10 +51,11 @@ def write_product(
 ) -> Path:
     """Write the product and return its path."""
     ds = result.layers.copy()
-    missing = [s.name for s in LAYERS if s.name not in ds]
+    missing = [s.name for s in LAYERS if s.required and s.name not in ds]
     if missing:
         raise ProductError(f"Algorithm did not produce layers: {missing}")
-    for spec in LAYERS:
+    present = {s.name for s in LAYERS if s.name in ds}
+    for spec in (s for s in LAYERS if s.name in present):
         da = ds[spec.name].astype(spec.dtype)
         if spec.keep_bits is not None:
             da = da.copy(data=round_mantissa(da.values, spec.keep_bits))
@@ -76,7 +77,10 @@ def write_product(
     )
     try:
         ds.to_netcdf(
-            out, engine="h5netcdf", mode="w", encoding=encoding(compression, chunks)
+            out,
+            engine="h5netcdf",
+            mode="w",
+            encoding=encoding(compression, chunks, present),
         )
         build_identification(workflow, result, processing_start).to_netcdf(
             out, group="identification", engine="h5netcdf", mode="a"

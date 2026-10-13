@@ -24,6 +24,8 @@ def test_product_structure(runconfig_file: Path):
     path = _product(runconfig_file)
     with h5py.File(path) as f:
         for spec in LAYERS:
+            if not spec.required and spec.name not in f:
+                continue  # context layer whose input was not given
             assert spec.name in f
             assert f[spec.name].dtype == np.dtype(spec.dtype)
             assert "units" in f[spec.name].attrs

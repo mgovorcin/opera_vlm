@@ -273,6 +273,29 @@ def _defo_areas(workflow: Workflow) -> tuple[list, str | None]:
     return geoms, ",".join(sorted(map(str, versions))) or None
 
 
+def context_layers(
+    workflow: Workflow, coarse: Grid, grid: Grid
+) -> tuple[dict[str, np.ndarray], dict[str, str]]:
+    """Plate-motion and GIA rates (m/yr) on `grid`, and their identification."""
+    from opera_vlm.context import frame_plate, gia_rate, plate_motion
+
+    opts = workflow.algorithm_parameters.context_options
+    plate = opts.plate or frame_plate(workflow.input_file_group.frame_id)
+    ve, vn = plate_motion(coarse, plate, opts.plate_model)
+    layers = {
+        "plate_motion_east_rate": warp(ve, coarse, grid),
+        "plate_motion_north_rate": warp(vn, coarse, grid),
+    }
+    ident = {"plate": plate, "plate_motion_model": opts.plate_model}
+    gia = workflow.static_ancillary_file_group.gia_model_file
+    if gia is not None:
+        layers["gia_vertical_rate"] = warp(
+            gia_rate(Path(gia), coarse, opts.gia_variable), coarse, grid
+        )
+        ident["gia_model"] = Path(gia).name
+    return layers, ident
+
+
 # ------------------------------------------------------------- the run
 def _ceos_runtime(
     stacks: list[GeometryStack], los: list[tuple[np.ndarray, ...]]
@@ -366,6 +389,7 @@ def run_algorithm(workflow: Workflow) -> Iterator[AlgorithmResult]:
     coarse = coarse_grid(grid, GNSS_POSTING_METERS)
     gnss = load_gnss(workflow, stacks, coarse)
     ceos = _ceos_runtime(stacks, los)
+    context, context_id = context_layers(workflow, coarse, grid)
     sources = [f for s in stacks for f in s.source_files]
     at_t0 = [resample_at(s, targets[0], workflow) for s in stacks]
 
@@ -403,6 +427,7 @@ def run_algorithm(workflow: Workflow) -> Iterator[AlgorithmResult]:
                 "east": (("y", "x"), res.east),
                 "east_std": (("y", "x"), res.sigma_east),
                 "mode": (("y", "x"), res.mode),
+                **{k: (("y", "x"), v) for k, v in context.items()},
             },
             coords={"x": grid.x, "y": grid.y},
             attrs={"epsg": grid.epsg},
@@ -415,6 +440,7 @@ def run_algorithm(workflow: Workflow) -> Iterator[AlgorithmResult]:
             identification={
                 "gnss_provenance_digest": gnss.provenance.digest,
                 "number_of_looks": len(stacks),
+                **context_id,
             },
             ceos=ceos,
         )

@@ -5,6 +5,12 @@ File name: `OPERA_<level>_<short name>_F<frame>_<start>_<end>_v<version>_<proces
 One run writes one product per target pair `(T0, Tk)`: target epochs are
 every `temporal_options.target_spacing_days` over the span both geometries
 cover, and `T0` (the first) is the reference of every product of the run.
+Context layers (meters per year, not removed from any layer):
+`plate_motion_east_rate` and `plate_motion_north_rate` (the frame's rigid
+plate in ITRF2020-PMM; `east - rate * span` is plate-fixed) and
+`gia_vertical_rate` (only when a GIA model file is given). `/identification`
+names the `plate`, `plate_motion_model` and `gia_model`.
+
 `/identification` also carries `gnss_provenance_digest` (the GNSS realisation
 used for north and, in mode 2, east) and `number_of_looks` (1 or 2).
 

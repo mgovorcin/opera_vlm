@@ -1,5 +1,42 @@
 {
   "$defs": {
+    "ContextOptions": {
+      "additionalProperties": false,
+      "description": "Context layers: rigid plate motion and GIA (opera_vlm.context).",
+      "properties": {
+        "plate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Plate of the plate_motion layers (ITRF2020-PMM name or UNR code: NA, PA, CA...). Null takes it from Venti's frame-parameter table.",
+          "title": "Plate"
+        },
+        "plate_model": {
+          "default": "ITRF2020-PMM",
+          "description": "Plate-motion model (geepers.euler).",
+          "enum": [
+            "ITRF2020-PMM",
+            "ITRF2014-PMM"
+          ],
+          "title": "Plate Model",
+          "type": "string"
+        },
+        "gia_variable": {
+          "default": "Drad_250",
+          "description": "Vertical-rate variable of the GIA model file (mm/yr); ICE-6G_D calls it Drad_250.",
+          "title": "Gia Variable",
+          "type": "string"
+        }
+      },
+      "title": "ContextOptions",
+      "type": "object"
+    },
     "DecompositionOptions": {
       "additionalProperties": false,
       "description": "LOS -> east/up (venti.decomposition).",
@@ -151,6 +188,9 @@
     },
     "gnss_options": {
       "$ref": "#/$defs/GnssOptions"
+    },
+    "context_options": {
+      "$ref": "#/$defs/ContextOptions"
     }
   },
   "title": "AlgorithmParameters",

@@ -159,6 +159,33 @@ class GnssOptions(YamlModel):
     model_config = STRICT_CONFIG
 
 
+class ContextOptions(YamlModel):
+    """Context layers: rigid plate motion and GIA (opera_vlm.context)."""
+
+    plate: Optional[str] = Field(
+        default=None,
+        description=(
+            "Plate of the plate_motion layers (ITRF2020-PMM name or UNR code: NA, PA,"
+            " CA...). Null takes it from Venti's frame-parameter table."
+        ),
+    )
+
+    plate_model: Literal["ITRF2020-PMM", "ITRF2014-PMM"] = Field(
+        default="ITRF2020-PMM",
+        description="Plate-motion model (geepers.euler).",
+    )
+
+    gia_variable: str = Field(
+        default="Drad_250",
+        description=(
+            "Vertical-rate variable of the GIA model file (mm/yr); ICE-6G_D calls it"
+            " Drad_250."
+        ),
+    )
+
+    model_config = STRICT_CONFIG
+
+
 class AlgorithmParameters(YamlModel):
     """OPERA Vertical Land Motion from DISP and DISP-CAL algorithm parameters."""
 
@@ -180,6 +207,11 @@ class AlgorithmParameters(YamlModel):
     gnss_options: GnssOptions = Field(
         default_factory=GnssOptions,
         description="Horizontal GNSS used to fix north (and east in mode 2).",
+    )
+
+    context_options: ContextOptions = Field(
+        default_factory=ContextOptions,
+        description="Context layers: rigid plate motion and GIA (opera_vlm.context).",
     )
 
     model_config = STRICT_CONFIG

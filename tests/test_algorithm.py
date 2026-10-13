@@ -203,3 +203,13 @@ def test_products_one_per_pair(frame, tmp_path):
     with h5py.File(products[0]) as f:
         assert f["identification/number_of_looks"][()] == 2
         assert len(f["identification/gnss_provenance_digest"][()]) == 64
+
+
+def test_row_blocks_cover_every_row_once():
+    from opera_vlm.algorithm import row_blocks
+
+    for ny, size in ((10, 4), (9, 4), (1025, 512), (3, 512), (513, 512)):
+        blocks = row_blocks(ny, size)
+        rows = [r for b in blocks for r in range(b.start, b.stop)]
+        assert rows == list(range(ny))
+        assert all(b.stop - b.start >= 2 for b in blocks) or ny < 2

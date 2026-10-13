@@ -33,7 +33,7 @@ dependencies = [
   "rioxarray",
   "rasterio>=1.4",
   "pyproj>=3.3",
-  "venti @ git+https://github.com/mgovorcin/venti-dev.git@d67c452efb1666126943f8615b49b41b2f03a87c",
+  "venti @ git+https://github.com/mgovorcin/venti-dev.git@3346bd53880864692c63a613121c4b7ea3acf239",
 ]
 
 [project.urls]

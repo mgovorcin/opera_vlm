@@ -110,6 +110,19 @@ def warp(values: np.ndarray, src: Grid, dst: Grid) -> np.ndarray:
     return out
 
 
+def row_blocks(ny: int, size: int = ROW_BLOCK) -> list[slice]:
+    """Row slices of at most `size` rows; none shorter than 2 (a grid needs a dy)."""
+    starts = list(range(0, ny, size))
+    if len(starts) > 1 and ny - starts[-1] < 2:
+        starts.pop()
+    return [slice(a, b) for a, b in zip(starts, [*starts[1:], ny], strict=True)]
+
+
+def sub_grid(grid: Grid, rows: slice) -> Grid:
+    """Return the rows `rows` of `grid` as a grid."""
+    return Grid(x=grid.x, y=grid.y[rows], epsg=grid.epsg)
+
+
 def coarse_grid(grid: Grid, posting: float) -> Grid:
     """Build a regular grid of about `posting` metres whose centres span `grid`."""
 
@@ -139,7 +152,8 @@ def read_los(path: Path, dst: Grid) -> tuple[np.ndarray, np.ndarray, np.ndarray]
     if nodata is not None and np.isfinite(nodata):
         enu[enu == nodata] = np.nan
     enu[:, ~np.isfinite(enu).all(axis=0)] = np.nan
-    e, n, u = (warp(c, src, dst) for c in enu)
+    # float32 as on disk: the LOS is held for the whole run
+    e, n, u = (warp(c, src, dst).astype(np.float32) for c in enu)
     return e, n, u
 
 
@@ -181,6 +195,12 @@ def resample_at(
     sigma = np.full((ny, nx), np.nan)
     if len(epochs) < opts.min_points:
         return value, sigma
+    logger.info(
+        "%s at %s: %d epochs in the window",
+        stack.name,
+        f"{target:%Y-%m-%d}",
+        len(epochs),
+    )
     dates = np.array(epochs, dtype="datetime64[s]")
     nearest = stack.nearest_epoch(target)
     for r0 in range(0, ny, ROW_BLOCK):
@@ -283,15 +303,15 @@ def context_layers(
     plate = opts.plate or frame_plate(workflow.input_file_group.frame_id)
     ve, vn = plate_motion(coarse, plate, opts.plate_model)
     layers = {
-        "plate_motion_east_rate": warp(ve, coarse, grid),
-        "plate_motion_north_rate": warp(vn, coarse, grid),
+        "plate_motion_east_rate": warp(ve, coarse, grid).astype(np.float32),
+        "plate_motion_north_rate": warp(vn, coarse, grid).astype(np.float32),
     }
     ident = {"plate": plate, "plate_motion_model": opts.plate_model}
     gia = workflow.static_ancillary_file_group.gia_model_file
     if gia is not None:
         layers["gia_vertical_rate"] = warp(
             gia_rate(Path(gia), coarse, opts.gia_variable), coarse, grid
-        )
+        ).astype(np.float32)
         ident["gia_model"] = Path(gia).name
     return layers, ident
 
@@ -393,40 +413,68 @@ def run_algorithm(workflow: Workflow) -> Iterator[AlgorithmResult]:
     sources = [f for s in stacks for f in s.source_files]
     at_t0 = [resample_at(s, targets[0], workflow) for s in stacks]
 
-    for tk in targets[1:]:
+    for k, tk in enumerate(targets[1:], 1):
+        logger.info("target pair %d/%d: %s", k, len(targets) - 1, f"{tk:%Y-%m-%d}")
         looks, sigmas = [], []
         for s, (v0, s0) in zip(stacks, at_t0, strict=True):
-            vk, sk = resample_at(s, tk, workflow)
-            d = vk - v0
-            sig = np.sqrt(s0**2 + sk**2 + dec.sigma_disp_meters**2)
-            looks.append(warp(d, s.grid, grid))
-            sigmas.append(warp(sig, s.grid, grid))
+            d, sig = resample_at(s, tk, workflow)
+            d -= v0  # in place: the pair R(Tk) - R(T0)
+            np.sqrt(s0**2 + sig**2 + dec.sigma_disp_meters**2, out=sig)
+            looks.append(d)
+            sigmas.append(sig)
         g = pair_displacement(gnss, targets[0], tk)
         mm = 1e-3  # the UNR grid is in mm
-        de, dn = (warp(g[k] * mm, coarse, grid) for k in ("de", "dn"))
-        sde, sdn = (
-            warp(np.nan_to_num(g[k]) * mm, coarse, grid)
-            for k in ("sigma_de", "sigma_dn")
-        )
-        res = decompose(
-            looks,
-            sigmas,
-            los,
-            de,
-            dn,
-            sigma_east_gnss=sde,
-            sigma_north_gnss=sdn,
-            cond_max=dec.cond_max,
-            min_up=dec.min_up,
-        )
-        logger.info("%s_%s: %s", f"{targets[0]:%Y%m%d}", f"{tk:%Y%m%d}", res.counts())
+        gnss_m = {
+            "de": g["de"] * mm,
+            "dn": g["dn"] * mm,
+            "sde": np.nan_to_num(g["sigma_de"]) * mm,
+            "sdn": np.nan_to_num(g["sigma_dn"]) * mm,
+        }
+        out = {
+            name: np.full(grid.shape, np.nan, dtype=np.float32)
+            for name in ("vertical", "vertical_std", "east", "east_std")
+        }
+        mode = np.zeros(grid.shape, dtype=np.uint8)
+        # row blocks: the descending warp, the GNSS interpolation and the
+        # decomposition never hold more than a block in float64
+        for rows in row_blocks(grid.shape[0]):
+            block = sub_grid(grid, rows)
+            b_looks = [
+                look[rows] if s.grid.same_as(grid) else warp(look, s.grid, block)
+                for look, s in zip(looks, stacks, strict=True)
+            ]
+            b_sig = [
+                sg[rows] if s.grid.same_as(grid) else warp(sg, s.grid, block)
+                for sg, s in zip(sigmas, stacks, strict=True)
+            ]
+            b_gnss = {key: warp(v, coarse, block) for key, v in gnss_m.items()}
+            res = decompose(
+                b_looks,
+                b_sig,
+                [tuple(c[rows].astype(np.float64) for c in enu) for enu in los],
+                b_gnss["de"],
+                b_gnss["dn"],
+                sigma_east_gnss=b_gnss["sde"],
+                sigma_north_gnss=b_gnss["sdn"],
+                cond_max=dec.cond_max,
+                min_up=dec.min_up,
+            )
+            out["vertical"][rows] = res.up
+            out["vertical_std"][rows] = res.sigma_up
+            out["east"][rows] = res.east
+            out["east_std"][rows] = res.sigma_east
+            mode[rows] = res.mode
+        del looks, sigmas
+        counts = {
+            "none": int((mode == 0).sum()),
+            "wls": int((mode == 1).sum()),
+            "projection": int((mode == 2).sum()),
+        }
+        logger.info("%s_%s: %s", f"{targets[0]:%Y%m%d}", f"{tk:%Y%m%d}", counts)
         layers = xr.Dataset(
             {
-                "vertical": (("y", "x"), res.up),
-                "vertical_std": (("y", "x"), res.sigma_up),
-                "east": (("y", "x"), res.east),
-                "east_std": (("y", "x"), res.sigma_east),
-                "mode": (("y", "x"), res.mode),
+                **{name: (("y", "x"), v) for name, v in out.items()},
+                "mode": (("y", "x"), mode),
                 **{k: (("y", "x"), v) for k, v in context.items()},
             },
             coords={"x": grid.x, "y": grid.y},

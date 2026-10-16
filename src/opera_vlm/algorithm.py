@@ -335,9 +335,13 @@ def _has_gnss_layers(cal_product: Path) -> bool:
 
 
 def _defo_areas(workflow: Workflow) -> tuple[list, str | None]:
-    import json
+    """Deforming areas and the database version, read as DISP-CAL reads them.
 
-    from shapely.geometry import shape
+    Venti's loader (`venti.calibration.remove_restore.load_area_db`) is the
+    one cal-disp uses, so the version recorded in the DISP-CAL provenance
+    (the database's top-level ``version``) and this one always agree.
+    """
+    from venti.calibration.remove_restore import load_area_db
 
     path = workflow.static_ancillary_file_group.defo_area_db_json
     if path is None:
@@ -346,11 +350,8 @@ def _defo_areas(workflow: Workflow) -> tuple[list, str | None]:
             " static_ancillary_file_group.defo_area_db_json",
             1003,
         )
-    db = json.loads(Path(path).read_text())
-    geoms = [shape(f["geometry"]) for f in db["features"]]
-    versions = {f.get("properties", {}).get("version") for f in db["features"]}
-    versions.discard(None)
-    return geoms, ",".join(sorted(map(str, versions))) or None
+    db = load_area_db(path)
+    return db.shapes(), db.version
 
 
 def context_layers(

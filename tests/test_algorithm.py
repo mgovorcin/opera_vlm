@@ -263,3 +263,29 @@ def test_row_blocks_cover_every_row_once():
         rows = [r for b in blocks for r in range(b.start, b.stop)]
         assert rows == list(range(ny))
         assert all(b.stop - b.start >= 2 for b in blocks) or ny < 2
+
+
+def test_defo_area_version_is_read_as_disp_cal_reads_it():
+    """The area database's top-level version (Venti's loader, as cal-disp) is
+    what the DISP-CAL provenance records, so VLM and DISP-CAL can match."""
+    from types import SimpleNamespace
+
+    import venti
+
+    from opera_vlm.algorithm import _defo_areas
+
+    db = Path(venti.__file__).parent / "data" / "defo_area_db_v1.geojson"
+    wf = SimpleNamespace(
+        static_ancillary_file_group=SimpleNamespace(defo_area_db_json=db)
+    )
+    geoms, version = _defo_areas(wf)
+    import json
+
+    assert version == json.loads(db.read_text())["version"]  # e.g. '1.1-draft'
+    assert len(geoms) == len(json.loads(db.read_text())["features"]) > 0
+    with pytest.raises(InputValidationError, match="defo_area_db_json"):
+        _defo_areas(
+            SimpleNamespace(
+                static_ancillary_file_group=SimpleNamespace(defo_area_db_json=None)
+            )
+        )

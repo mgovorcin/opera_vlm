@@ -3,7 +3,10 @@
 Format: [Keep a Changelog](https://keepachangelog.com). Versions come from git
 tags (setuptools_scm). Mark entries that change product values with **[product]**.
 
-## [Unreleased]
+## [0.1.0] — unreleased (Venti plan T57.3; tag `v0.1.0` by the owner)
+
+First release: VLM per target pair from DISP-S1 + DISP-CAL, validated on LA
+(passes the VLM gate) and Houston (edge case). Frozen interfaces: ADR 0002.
 
 ### Added
 - **[product]** The VLM workflow (plan T56.2): `opera-vlm run` reads the
@@ -36,8 +39,15 @@ tags (setuptools_scm). Mark entries that change product values with **[product]*
 ### Changed
 - Venti pin a0fe190 -> d67c452 (venti-dev main: `venti.gnss.vlm`).
 
+### Fixed
+- The area-database version is read with Venti's `load_area_db`, as cal-disp
+  does: VLM runs now match remove-restore DISP-CAL (cal-disp v0.5.0) instead
+  of failing with error 1003 (#17).
+
+### Docs
+- ADR 0002 (v0.1 frozen interfaces); *Running on cal-disp v0.5 inputs*.
+
 ### Not yet
 - `output_options.write_velocity_product` fails with an algorithm error
   (exit 5) until the velocity-domain product is implemented.
-- The first real asc/desc frame (T56.1).
 - Initial scaffold (sas-scaffold).

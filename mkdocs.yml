@@ -7,6 +7,10 @@ nav:
   - Product specification: product-spec.md
   - Error codes: error-codes.md
   - CEOS-ARD compliance: ceos-compliance.md
+  - Running on cal-disp v0.5 inputs: v05-inputs.md
+  - Decisions:
+      - 0001 Runconfig and product: decisions/0001-runconfig-draft.md
+      - 0002 v0.1 frozen interfaces: decisions/0002-v0.1-frozen-interfaces.md
 plugins:
   - search
   - mkdocstrings

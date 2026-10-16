@@ -30,7 +30,7 @@ jobs:
         id: version
         run: echo "version=$(docker/pep440-version.sh)" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - uses: docker/metadata-action@v6
         id: meta

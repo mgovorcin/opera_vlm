@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from opera_vlm.errors import ProductError
 
+from ._georef import add_grid_mapping
 from ._layers import LAYERS, encoding, round_mantissa
 from ._metadata import build_identification, build_metadata
 
@@ -60,6 +61,9 @@ def write_product(
         if spec.keep_bits is not None:
             da = da.copy(data=round_mantissa(da.values, spec.keep_bits))
         ds[spec.name] = da.assign_attrs(spec.attrs())
+    if "epsg" not in ds.attrs:
+        raise ProductError("Algorithm layers carry no 'epsg': cannot georeference")
+    ds = add_grid_mapping(ds, int(ds.attrs["epsg"]))
     ds.attrs.update(
         Conventions="CF-1.8",
         title="OPERA VLM-S1 product",

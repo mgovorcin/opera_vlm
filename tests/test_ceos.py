@@ -17,6 +17,7 @@ from opera_vlm.product._ceos import (
     CEOS_STATIC,
     check_compliance,
     compliance_matrix,
+    is_compliant,
 )
 
 DOC = Path(__file__).parents[1] / "docs" / "ceos-compliance.md"
@@ -53,3 +54,20 @@ def test_product_ceos_fields(runconfig_file: Path):
             assert status[f.name] == expected, f.name
     # runtime fields come from the inputs (satellites, orbit, incidence angles)
     assert all(status[f.name] == "ok" for f in CEOS_FIELDS if f.source == "runtime")
+
+
+def test_ungridded_product_not_compliant(runconfig_file: Path, tmp_path: Path):
+    import h5py
+
+    rc = RunConfig.from_yaml_file(runconfig_file)
+    product = run(rc.to_workflow())[-1]
+    broken = tmp_path / "ungridded.nc"
+    broken.write_bytes(product.read_bytes())
+    with h5py.File(broken, "a") as f:
+        del f["vertical"].attrs["grid_mapping"]
+    report = check_compliance(broken)
+    status = {f.name: s for f, s in report}
+    assert status["product_coordinate_reference_system"] == "ungridded"
+    assert not is_compliant(report)
+    intact = {f.name: s for f, s in check_compliance(product)}
+    assert intact["product_coordinate_reference_system"] == "ok"

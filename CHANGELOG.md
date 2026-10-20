@@ -3,6 +3,22 @@
 Format: [Keep a Changelog](https://keepachangelog.com). Versions come from git
 tags (setuptools_scm). Mark entries that change product values with **[product]**.
 
+## [Unreleased]
+
+### Fixed
+- **[product]** Products are georeferenced (CF-1.8 + GDAL), as
+  `docs/product-spec.md` already promised: a scalar `spatial_ref` grid mapping
+  (CF grid-mapping attributes, `crs_wkt`, `spatial_ref` WKT, `GeoTransform`),
+  `grid_mapping = "spatial_ref"` on every 2-D layer and CF
+  `standard_name`/`units` on `x`/`y`. Before, the CRS was only the global
+  `epsg` attribute (kept), so GDAL and CF readers could not place the layers.
+  Layer values are unchanged; the structure gains one variable and attributes
+  (additive, ADR 0002). No golden product had been delivered yet.
+- CEOS-ARD: new computed field `identification/product_coordinate_reference_system`
+  (PFS 1.7.9, `EPSG:<code> (<name>)`); `opera-vlm ceos check` reports it
+  `ungridded` (NOT COMPLIANT) unless every 2-D layer points at the
+  `spatial_ref` grid mapping.
+
 ## [0.1.0] — unreleased (Venti plan T57.3; tag `v0.1.0` by the owner)
 
 First release: VLM per target pair from DISP-S1 + DISP-CAL, validated on LA

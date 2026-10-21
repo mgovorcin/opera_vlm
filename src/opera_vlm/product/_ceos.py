@@ -101,6 +101,9 @@ CEOS_FIELDS: list[CeosField] = [
               "Number of nodata pixels in the main product layer."),
     CeosField("product_bounding_box", "identification", "1.7.7", "computed",
               "Product bounding box: xmin, ymin, xmax, ymax, EPSG."),
+    CeosField("product_coordinate_reference_system", "identification", "1.7.9", "computed",
+              "Coordinate reference system of the grid (EPSG code and name); every"
+              " layer carries CF grid_mapping 'spatial_ref' (crs_wkt, GeoTransform)."),
     # --- metadata ---------------------------------------------------------
     CeosField("product_pixel_coordinate_convention", "metadata", "1.7.10", "computed",
               "Pixel coordinate convention of x/y (pixel center or corner)."),
@@ -167,6 +170,7 @@ def _iso(dt) -> str:
 
 def _computed(result: "AlgorithmResult") -> dict[str, Any]:
     """Values derivable from the product layers and the job's inputs."""
+    from ._georef import crs_label
     from ._layers import LAYERS
 
     ds = result.layers
@@ -199,6 +203,8 @@ def _computed(result: "AlgorithmResult") -> dict[str, Any]:
         out["product_bounding_box"] = (
             ", ".join(f"{b:.3f}" for b in bounds) + f", EPSG:{epsg}"
         )
+        if epsg:
+            out["product_coordinate_reference_system"] = crs_label(int(epsg))
     main = LAYERS[0]
     if main.name in ds:
         data = np.asarray(ds[main.name].values)
@@ -234,11 +240,19 @@ def ceos_values(result: "AlgorithmResult") -> dict[str, dict[str, Any]]:
 
 
 def check_compliance(product: Path | str) -> list[tuple[CeosField, str]]:
-    """(field, status) for every declared field; status ok|missing|placeholder."""
+    """(field, status) for every declared field; status ok|missing|placeholder.
+
+    ``product_coordinate_reference_system`` is also checked against the file
+    itself: it is ``ungridded`` unless every 2-D layer points at a
+    ``spatial_ref`` grid mapping with a WKT (`georef_problems`).
+    """
     import h5py
+
+    from ._georef import georef_problems
 
     report = []
     with h5py.File(product, "r") as h5:
+        problems = georef_problems(h5)
         for f in CEOS_FIELDS:
             key = f"{f.group}/{f.name}"
             if key not in h5:
@@ -246,7 +260,12 @@ def check_compliance(product: Path | str) -> list[tuple[CeosField, str]]:
                 continue
             value = h5[key][()]
             text = value.decode() if isinstance(value, bytes) else str(value)
-            report.append((f, "placeholder" if PLACEHOLDER in text else "ok"))
+            if PLACEHOLDER in text:
+                report.append((f, "placeholder"))
+            elif f.name == "product_coordinate_reference_system" and problems:
+                report.append((f, "ungridded"))
+            else:
+                report.append((f, "ok"))
     return report
 
 

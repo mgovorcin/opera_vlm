@@ -19,7 +19,7 @@ in code). Groups:
 
 | Group | Content |
 |---|---|
-| `/` | Product layers (see `LAYERS`), `x`, `y`, `spatial_ref` |
+| `/` | Product layers (see `LAYERS`), `x`, `y` (pixel centres, CF `projection_x/y_coordinate`), `spatial_ref` (CF grid mapping: `crs_wkt`, GDAL `spatial_ref` + `GeoTransform`; every 2-D layer has `grid_mapping = "spatial_ref"`) |
 | `/identification` | Searchable scalars: product type/version, dates, frame, processing facility, source granules |
 | CEOS-ARD | Fields declared in `product/_ceos.py`, written into `/identification` and `/metadata`; matrix: [ceos-compliance.md](ceos-compliance.md) |
 | `/metadata` | Provenance: SAS + dependency versions, algorithm parameters (after overrides), applied overrides, PGE runconfig, resolved workflow |

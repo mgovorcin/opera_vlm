@@ -57,3 +57,34 @@ def test_round_mantissa_bounded_error():
     assert np.isnan(y[0])
     rel = np.abs((y[1:] - x[1:]) / x[1:])
     assert rel.max() <= 2.0**-10
+
+
+def test_product_georeferenced(runconfig_file: Path):
+    import rasterio
+
+    path = _product(runconfig_file)
+    with h5py.File(path) as f:
+        epsg = int(np.asarray(f.attrs["epsg"]).ravel()[0])
+        ref = f["spatial_ref"]
+        assert "crs_wkt" in ref.attrs and "GeoTransform" in ref.attrs
+        layers = [
+            n for n, o in f.items() if isinstance(o, h5py.Dataset) and o.ndim == 2
+        ]
+        assert layers
+        for name in layers:
+            assert f[name].attrs["grid_mapping"] in (
+                b"spatial_ref",
+                "spatial_ref",
+            ), name
+        x, y = f["x"][:], f["y"][:]
+        assert f["x"].attrs["standard_name"] in (
+            b"projection_x_coordinate",
+            "projection_x_coordinate",
+        )
+    # GDAL reads the CRS and the pixel grid from the file alone
+    with rasterio.open(f"NETCDF:{path}:{LAYERS[0].name}") as src:
+        assert src.crs.to_epsg() == epsg
+        dx = x[1] - x[0]
+        assert src.transform.a == np.float64(dx)
+        assert np.isclose(src.transform.c, x[0] - dx / 2)
+        assert np.isclose(src.transform.f, y[0] - (y[1] - y[0]) / 2)

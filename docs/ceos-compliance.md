@@ -27,6 +27,7 @@ Source: *static* = constant in `CEOS_STATIC`; *computed* = derived from the prod
 | 1.7.3 | `product_sample_spacing` | identification | computed | yes | Product pixel spacing (map units, x and y). |
 | 1.7 | `nodata_pixel_count` | identification | computed | yes | Number of nodata pixels in the main product layer. |
 | 1.7.7 | `product_bounding_box` | identification | computed | yes | Product bounding box: xmin, ymin, xmax, ymax, EPSG. |
+| 1.7.9 | `product_coordinate_reference_system` | identification | computed | yes | Coordinate reference system of the grid (EPSG code and name); every layer carries CF grid_mapping 'spatial_ref' (crs_wkt, GeoTransform). |
 | 1.7.10 | `product_pixel_coordinate_convention` | metadata | computed | yes | Pixel coordinate convention of x/y (pixel center or corner). |
 | 3.11 | `ceos_product_measurement_projection` | metadata | static | yes | `vertical` |
 | 3 | `ceos_atmospheric_phase_correction` | metadata | static | yes | **TODO** |
